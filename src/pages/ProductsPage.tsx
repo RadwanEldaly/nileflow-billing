@@ -29,6 +29,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     code: '',
     name: '',
     wood_type: 'MDF',
+    size: '',
+    color: '',
     category: 'ألواح أخشاب',
     purchase_price: '',
     selling_price: '',
@@ -44,7 +46,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     const matchesSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.wood_type.toLowerCase().includes(searchTerm.toLowerCase());
+      p.wood_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.size || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.color || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesWood = selectedWoodType === 'all' || p.wood_type === selectedWoodType;
     return matchesSearch && matchesWood;
   });
@@ -63,6 +67,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         code: formData.code || editingProduct.code,
         name: formData.name,
         wood_type: formData.wood_type,
+        size: formData.size || undefined,
+        color: formData.color || undefined,
         category: formData.category,
         purchase_price: pPrice,
         selling_price: sPrice,
@@ -78,6 +84,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         code: generatedCode,
         name: formData.name,
         wood_type: formData.wood_type,
+        size: formData.size || undefined,
+        color: formData.color || undefined,
         category: formData.category,
         purchase_price: pPrice,
         selling_price: sPrice,
@@ -93,6 +101,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       code: '',
       name: '',
       wood_type: 'MDF',
+      size: '',
+      color: '',
       category: 'ألواح أخشاب',
       purchase_price: '',
       selling_price: '',
@@ -110,6 +120,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       code: prod.code,
       name: prod.name,
       wood_type: prod.wood_type,
+      size: prod.size || '',
+      color: prod.color || '',
       category: prod.category || 'ألواح أخشاب',
       purchase_price: String(prod.purchase_price),
       selling_price: String(prod.selling_price),
@@ -152,6 +164,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                 code: '',
                 name: '',
                 wood_type: 'MDF',
+                size: '',
+                color: '',
                 category: 'ألواح أخشاب',
                 purchase_price: '',
                 selling_price: '',
@@ -209,6 +223,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   <th className="px-6 py-3.5">كود اللوح</th>
                   <th className="px-6 py-3.5">اسم المنتج / اللوح</th>
                   <th className="px-6 py-3.5">نوع الخشب</th>
+                  <th className="px-6 py-3.5">المقاس</th>
+                  <th className="px-6 py-3.5">اللون</th>
                   <th className="px-6 py-3.5">سعر الشراء</th>
                   <th className="px-6 py-3.5">سعر البيع</th>
                   <th className="px-6 py-3.5">رصيد الألواح الحالي</th>
@@ -227,6 +243,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                           {p.wood_type}
                         </span>
                       </td>
+                      <td className="px-6 py-4 font-mono text-xs text-slate-600 dark:text-slate-300">{p.size || '—'}</td>
+                      <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-300">{p.color || '—'}</td>
                       <td className="px-6 py-4 font-mono text-slate-500">{p.purchase_price} EGP</td>
                       <td className="px-6 py-4 font-extrabold text-amber-700 dark:text-amber-400">{p.selling_price} EGP</td>
                       <td className="px-6 py-4 font-black">
@@ -321,6 +339,34 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     placeholder="MDF / كونتر / أبلكاش"
                     value={formData.wood_type}
                     onChange={(e) => setFormData({ ...formData, wood_type: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    المقاس
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="مثال: 08*22"
+                    value={formData.size}
+                    onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-mono font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    اللون / الدرجة
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="مثال: BEYAZ MAT 1001"
+                    value={formData.color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-bold"
                   />
                 </div>

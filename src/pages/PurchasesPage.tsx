@@ -9,6 +9,25 @@ interface PurchasesPageProps {
   warehouses: Warehouse[];
   language: 'ar' | 'en';
   onCreatePurchase: (invoice: Omit<PurchaseInvoice, 'id' | 'created_at'>) => void;
+  // يضيف صنف جديد للكتالوج ويرجعه فوراً (أو null لو فشلت الإضافة)، عشان نقدر
+  // نضيف أصناف جديدة (بكود/مقاس/لون) أثناء إدخال فاتورة الشراء نفسها.
+  onAddProduct: (product: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => Promise<Product | null>;
+}
+
+interface PurchaseLineItem {
+  mode: 'existing' | 'new';
+  // existing mode
+  productId: string;
+  // new-product mode
+  newCode: string;
+  newName: string;
+  newWoodType: string;
+  newSize: string;
+  newColor: string;
+  // common
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
 }
 
 export const PurchasesPage: React.FC<PurchasesPageProps> = ({
@@ -18,11 +37,13 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({
   warehouses,
   language,
   onCreatePurchase,
+  onAddProduct,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSupplierId, setSelectedSupplierId] = useState('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<PurchaseInvoice | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Form states
   const [supplierId, setSupplierId] = useState('');
@@ -32,22 +53,32 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({
   const [paidAmountInput, setPaidAmountInput] = useState('');
   const [notes, setNotes] = useState('');
 
-  const [lineItems, setLineItems] = useState<
-    { productId: string; quantity: number; unitPrice: number; lineTotal: number }[]
-  >([]);
+  const emptyNewLine = (): PurchaseLineItem => ({
+    mode: products.length > 0 ? 'existing' : 'new',
+    productId: products[0]?.id || '',
+    newCode: '',
+    newName: '',
+    newWoodType: 'MDF',
+    newSize: '',
+    newColor: '',
+    quantity: 10,
+    unitPrice: products[0]?.purchase_price || 0,
+    lineTotal: 10 * (products[0]?.purchase_price || 0),
+  });
+
+  const [lineItems, setLineItems] = useState<PurchaseLineItem[]>([]);
 
   const handleAddLineItem = () => {
-    if (products.length === 0) return;
-    const firstProd = products[0];
-    setLineItems([
-      ...lineItems,
-      {
-        productId: firstProd.id,
-        quantity: 10,
-        unitPrice: firstProd.purchase_price || 100,
-        lineTotal: 10 * (firstProd.purchase_price || 100),
-      },
-    ]);
+    setLineItems([...lineItems, emptyNewLine()]);
+  };
+
+  const handleToggleLineMode = (index: number) => {
+    const updated = [...lineItems];
+    updated[index] = {
+      ...updated[index],
+      mode: updated[index].mode === 'existing' ? 'new' : 'existing',
+    };
+    setLineItems(updated);
   };
 
   const handleProductChange = (index: number, prodId: string) => {
@@ -57,6 +88,12 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({
     updated[index].productId = prodId;
     updated[index].unitPrice = prod.purchase_price;
     updated[index].lineTotal = updated[index].quantity * prod.purchase_price;
+    setLineItems(updated);
+  };
+
+  const handleNewLineFieldChange = (index: number, field: 'newCode' | 'newName' | 'newWoodType' | 'newSize' | 'newColor', value: string) => {
+    const updated = [...lineItems];
+    updated[index] = { ...updated[index], [field]: value };
     setLineItems(updated);
   };
 
@@ -86,7 +123,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({
   const paidVal = paidAmountInput !== '' ? parseFloat(paidAmountInput) : grandTotal;
   const remainingVal = Math.max(0, grandTotal - paidVal);
 
-  const handleSaveInvoice = (e: React.FormEvent) => {
+  const handleSaveInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supplierId) {
       alert('برجاء اختيار المورد');
@@ -97,44 +134,116 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({
       return;
     }
 
-    const nextSeq = purchaseInvoices.length + 1;
-    const formattedNum = `PUR-WOOD-${String(nextSeq).padStart(5, '0')}`;
+    // تحقق من صحة أسطر "صنف جديد" قبل أي محاولة حفظ
+    for (const item of lineItems) {
+      if (item.mode === 'new' && (!item.newCode.trim() || !item.newName.trim())) {
+        alert('برجاء إدخال كود واسم لكل صنف جديد قبل الحفظ');
+        return;
+      }
+    }
 
-    const itemsPrepared: PurchaseInvoiceItem[] = lineItems.map((item) => {
-      const prod = products.find((p) => p.id === item.productId);
-      return {
+    setIsSaving(true);
+    try {
+      // 1) إنشاء أي أصناف جديدة أولاً (بالكود والمقاس واللون) والحصول على الـ id بتاعها
+      const resolvedItems: { productId: string; name: string; wood_type: string; size?: string; color?: string; quantity: number; unitPrice: number; lineTotal: number }[] = [];
+
+      for (const item of lineItems) {
+        if (item.mode === 'existing') {
+          const prod = products.find((p) => p.id === item.productId);
+          if (!prod) {
+            alert('برجاء اختيار صنف صحيح لكل الأسطر');
+              setIsSaving(false);
+            return;
+          }
+          resolvedItems.push({
+            productId: prod.id,
+            name: prod.name,
+            wood_type: prod.wood_type,
+            size: prod.size,
+            color: prod.color,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            lineTotal: item.lineTotal,
+          });
+        } else {
+          const newProduct = await onAddProduct({
+            code: item.newCode.trim(),
+            name: item.newName.trim(),
+            wood_type: item.newWoodType || 'MDF',
+            size: item.newSize.trim() || undefined,
+            color: item.newColor.trim() || undefined,
+            category: 'ألواح أخشاب',
+            purchase_price: item.unitPrice,
+            // مفيش سعر بيع محدد وقت الشراء، فبنبدأ بنفس سعر الشراء كنقطة بداية
+            // ولازم تتعدل من صفحة "الأصناف" حسب هامش الربح المطلوب.
+            selling_price: item.unitPrice,
+            stock_quantity: 0,
+            min_stock_level: 10,
+            supplier_id: supplierId,
+            default_warehouse_id: warehouseId,
+            notes: 'تمت الإضافة تلقائياً من فاتورة شراء',
+            is_active: true,
+          });
+
+          if (!newProduct) {
+            // onAddProduct already alerted the user with the exact reason
+            setIsSaving(false);
+            return;
+          }
+
+          resolvedItems.push({
+            productId: newProduct.id,
+            name: newProduct.name,
+            wood_type: newProduct.wood_type,
+            size: newProduct.size,
+            color: newProduct.color,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            lineTotal: item.lineTotal,
+          });
+        }
+      }
+
+      const nextSeq = purchaseInvoices.length + 1;
+      const formattedNum = `PUR-WOOD-${String(nextSeq).padStart(5, '0')}`;
+
+      const itemsPrepared: PurchaseInvoiceItem[] = resolvedItems.map((item) => ({
         id: crypto.randomUUID(),
         invoice_id: '',
         product_id: item.productId,
-        product_name_snapshot: prod ? prod.name : 'صنف مجهول',
-        wood_type_snapshot: prod ? prod.wood_type : 'ألواح',
+        product_name_snapshot: item.name,
+        wood_type_snapshot: item.wood_type,
+        size_snapshot: item.size,
+        color_snapshot: item.color,
         quantity_sheets: item.quantity,
         unit_price: item.unitPrice,
         line_total: item.lineTotal,
-      };
-    });
+      }));
 
-    onCreatePurchase({
-      invoice_number: formattedNum,
-      supplier_id: supplierId,
-      warehouse_id: warehouseId,
-      invoice_date: invoiceDate,
-      status: 'approved',
-      subtotal,
-      discount: discountVal,
-      total: grandTotal,
-      paid_amount: paidVal,
-      remaining_balance: remainingVal,
-      notes,
-      items: itemsPrepared,
-    });
+      onCreatePurchase({
+        invoice_number: formattedNum,
+        supplier_id: supplierId,
+        warehouse_id: warehouseId,
+        invoice_date: invoiceDate,
+        status: 'approved',
+        subtotal,
+        discount: discountVal,
+        total: grandTotal,
+        paid_amount: paidVal,
+        remaining_balance: remainingVal,
+        notes,
+        items: itemsPrepared,
+      });
 
-    setIsCreateModalOpen(false);
-    setSupplierId('');
-    setLineItems([]);
-    setPaidAmountInput('');
-    setDiscountInput('0');
-    setNotes('');
+      setIsCreateModalOpen(false);
+      setSupplierId('');
+      setLineItems([]);
+      setPaidAmountInput('');
+      setDiscountInput('0');
+      setNotes('');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const filteredInvoices = purchaseInvoices.filter((inv) => {
@@ -164,7 +273,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({
         <button
           onClick={() => {
             setIsCreateModalOpen(true);
-            if (lineItems.length === 0 && products.length > 0) handleAddLineItem();
+            if (lineItems.length === 0) setLineItems([emptyNewLine()]);
           }}
           className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-sm transition"
         >
@@ -349,54 +458,134 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({
 
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                   {lineItems.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                      <div className="flex-1">
-                        <select
-                          value={item.productId}
-                          onChange={(e) => handleProductChange(idx, e.target.value)}
-                          className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold"
+                    <div key={idx} className="bg-slate-50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleLineMode(idx)}
+                          className={`shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition ${
+                            item.mode === 'new'
+                              ? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800'
+                              : 'bg-white text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                          }`}
                         >
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} ({p.wood_type}) - تكلفة الشراء: {p.purchase_price} EGP
-                            </option>
-                          ))}
-                        </select>
+                          {item.mode === 'new' ? '✨ صنف جديد' : '📦 من الكتالوج'}
+                        </button>
+
+                        {item.mode === 'existing' ? (
+                          <div className="flex-1">
+                            <select
+                              value={item.productId}
+                              onChange={(e) => handleProductChange(idx, e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold"
+                            >
+                              {products.length === 0 && <option value="">لا توجد أصناف بعد — اضغط "صنف جديد"</option>}
+                              {products.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} ({p.wood_type}{p.size ? ` - ${p.size}` : ''}{p.color ? ` - ${p.color}` : ''}) [{p.code}] - تكلفة سابقة: {p.purchase_price} EGP
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <div className="flex-1 text-[10px] text-amber-700 dark:text-amber-400 font-semibold">
+                            هيتضاف للكتالوج تلقائياً عند حفظ الفاتورة
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveLineItem(idx)}
+                          className="text-red-500 hover:text-red-700 p-1"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
 
-                      <div className="w-24">
-                        <label className="text-[10px] text-slate-400 block text-center">عدد الألواح</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => handleQuantityChange(idx, parseFloat(e.target.value) || 1)}
-                          className="w-full px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-center font-bold"
-                        />
-                      </div>
+                      {item.mode === 'new' && (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-0.5">كود الصنف *</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="مثال: 1001"
+                              value={item.newCode}
+                              onChange={(e) => handleNewLineFieldChange(idx, 'newCode', e.target.value)}
+                              className="w-full px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono font-bold"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-0.5">اسم الصنف *</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="مثال: FOR RAST MAT"
+                              value={item.newName}
+                              onChange={(e) => handleNewLineFieldChange(idx, 'newName', e.target.value)}
+                              className="w-full px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-0.5">المقاس</label>
+                            <input
+                              type="text"
+                              placeholder="مثال: 08*22"
+                              value={item.newSize}
+                              onChange={(e) => handleNewLineFieldChange(idx, 'newSize', e.target.value)}
+                              className="w-full px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono font-bold"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-0.5">اللون / الدرجة</label>
+                            <input
+                              type="text"
+                              placeholder="مثال: BEYAZ MAT 1001"
+                              value={item.newColor}
+                              onChange={(e) => handleNewLineFieldChange(idx, 'newColor', e.target.value)}
+                              className="w-full px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold"
+                            />
+                          </div>
+                          <div className="col-span-2 sm:col-span-4">
+                            <label className="text-[10px] text-slate-400 block mb-0.5">نوع الخشب</label>
+                            <input
+                              type="text"
+                              placeholder="MDF / كونتر / أبلكاش"
+                              value={item.newWoodType}
+                              onChange={(e) => handleNewLineFieldChange(idx, 'newWoodType', e.target.value)}
+                              className="w-full px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold"
+                            />
+                          </div>
+                        </div>
+                      )}
 
-                      <div className="w-24">
-                        <label className="text-[10px] text-slate-400 block text-center">سعر الشراء/لوح</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={item.unitPrice}
-                          onChange={(e) => handlePriceChange(idx, parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-center font-bold"
-                        />
-                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24">
+                          <label className="text-[10px] text-slate-400 block text-center">عدد الألواح</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => handleQuantityChange(idx, parseFloat(e.target.value) || 1)}
+                            className="w-full px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-center font-bold"
+                          />
+                        </div>
 
-                      <div className="w-24 text-left font-mono font-bold text-xs text-emerald-600">
-                        {item.lineTotal.toLocaleString()} EGP
-                      </div>
+                        <div className="w-24">
+                          <label className="text-[10px] text-slate-400 block text-center">سعر الشراء/لوح</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.unitPrice}
+                            onChange={(e) => handlePriceChange(idx, parseFloat(e.target.value) || 0)}
+                            className="w-full px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-center font-bold"
+                          />
+                        </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveLineItem(idx)}
-                        className="text-red-500 hover:text-red-700 p-1"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                        <div className="flex-1 text-left font-mono font-bold text-xs text-emerald-600">
+                          {item.lineTotal.toLocaleString()} EGP
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -445,9 +634,10 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-600 text-white shadow-md"
+                  disabled={isSaving}
+                  className="px-5 py-2 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-md"
                 >
-                  إضافة الألواح للمخزن واعتماد الشراء
+                  {isSaving ? 'جارٍ الحفظ...' : 'إضافة الألواح للمخزن واعتماد الشراء'}
                 </button>
               </div>
             </form>

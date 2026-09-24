@@ -92,13 +92,27 @@ export function App() {
   };
 
   // HANDLERS (Supabase Integrated)
-  const handleAddProduct = async (newProdData: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
+  // يرجع المنتج اللي اتضاف فعلاً (أو null لو فشلت الإضافة) عشان يستخدم فوراً
+  // في شاشات تانية زي فاتورة المشتريات (إضافة صنف جديد أثناء إدخال الفاتورة).
+  const handleAddProduct = async (
+    newProdData: Omit<Product, 'id' | 'created_at' | 'updated_at'>
+  ): Promise<Product | null> => {
     const { data, error } = await supabase.from('products').insert([newProdData]).select();
     if (data && data[0]) {
-      setProducts([data[0], ...products]);
-    } else {
-      console.error('Error adding product:', error);
+      setProducts((prev) => [data[0], ...prev]);
+      return data[0];
     }
+
+    console.error('Error adding product:', error);
+    // رسالة واضحة للمستخدم بدل ما تفشل الإضافة بصمت
+    if (error?.code === '23505') {
+      alert(
+        `⚠️ الصنف موجود بالفعل بنفس الكود والمقاس واللون (${newProdData.code} - ${newProdData.size || 'بدون مقاس'} - ${newProdData.color || 'بدون لون'}).\nلو عايز تضيف كمية لنفس الصنف، عدّل رصيده بدل إضافة صنف جديد.`
+      );
+    } else {
+      alert(`⚠️ حصل خطأ أثناء إضافة الصنف: ${error?.message || 'خطأ غير معروف'}`);
+    }
+    return null;
   };
 
   const handleUpdateProduct = async (id: string, updates: Partial<Product>) => {
@@ -107,6 +121,7 @@ export function App() {
       setProducts(products.map((p) => (p.id === id ? data[0] : p)));
     } else {
       console.error('Error updating product:', error);
+      alert(`⚠️ حصل خطأ أثناء تعديل الصنف: ${error?.message || 'خطأ غير معروف'}`);
     }
   };
 
@@ -244,6 +259,7 @@ export function App() {
       }
     } else {
       console.error('Error creating purchase invoice:', invError);
+      alert(`⚠️ حصل خطأ أثناء حفظ فاتورة الشراء: ${invError?.message || 'خطأ غير معروف'}`);
     }
   };
 
@@ -390,6 +406,7 @@ export function App() {
             warehouses={warehouses}
             language={language}
             onCreatePurchase={handleCreatePurchaseInvoice}
+            onAddProduct={handleAddProduct}
           />
         )}
 
