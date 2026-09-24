@@ -45,9 +45,9 @@ export interface Product {
   code: string;
   name: string;
   wood_type: string; // MDF, Counter (كونتر), Plywood (أبلكاش), Beech (زان), Pine (موسكي), etc.
-  size?: string; // المقاس, e.g. "08*22"
-  color?: string; // اللون / الدرجة, e.g. "BEYAZ MAT 1001"
   category?: string;
+  size?: string;
+  color?: string;
   purchase_price: number;
   selling_price: number;
   stock_quantity: number; // Sheet count (عدد الألواح)
@@ -55,6 +55,7 @@ export interface Product {
   default_warehouse_id?: string;
   supplier_id?: string;
   notes?: string;
+  received_date?: string; // تاريخ استلام/وصول الحمولة (بتاريخ الشحنة، مختلف عن created_at)
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -97,8 +98,6 @@ export interface SalesInvoiceItem {
   product_id?: string;
   product_name_snapshot: string;
   wood_type_snapshot?: string;
-  size_snapshot?: string;
-  color_snapshot?: string;
   quantity_sheets: number; // Sheet count
   unit_price: number;
   line_total: number;
@@ -129,8 +128,6 @@ export interface PurchaseInvoiceItem {
   product_id?: string;
   product_name_snapshot: string;
   wood_type_snapshot?: string;
-  size_snapshot?: string;
-  color_snapshot?: string;
   quantity_sheets: number;
   unit_price: number;
   line_total: number;

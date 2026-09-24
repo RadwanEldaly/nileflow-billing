@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Customer, Product, Warehouse, SalesInvoice, SalesInvoiceItem } from '../types';
 import { Search, Plus, Receipt, Printer, Trash2, X, FileText, CheckCircle2 } from 'lucide-react';
+import { amountToArabicWords } from '../lib/numberToArabicWords';
 
 interface SalesPageProps {
   salesInvoices: SalesInvoice[];
@@ -9,6 +10,7 @@ interface SalesPageProps {
   warehouses: Warehouse[];
   language: 'ar' | 'en';
   onCreateInvoice: (invoice: Omit<SalesInvoice, 'id' | 'created_at'>) => void;
+  onDeleteInvoice: (invoiceId: string) => void;
   isCreateOpenInitially?: boolean;
 }
 
@@ -19,6 +21,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({
   warehouses,
   language,
   onCreateInvoice,
+  onDeleteInvoice,
   isCreateOpenInitially = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -231,6 +234,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                   <th className="px-6 py-3.5">المدفوع</th>
                   <th className="px-6 py-3.5">المتبقي (دين)</th>
                   <th className="px-6 py-3.5 text-center">معاينة وطباعة</th>
+                  <th className="px-6 py-3.5 text-center">إجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -259,6 +263,20 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                         >
                           <FileText className="w-3.5 h-3.5" />
                           <span>عرض الفاتورة</span>
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button
+                          onClick={() => {
+                            const confirmed = window.confirm(
+                              `متأكد إنك عايز تحذف فاتورة "${inv.invoice_number}" نهائيًا؟ هيترجع رصيد الألواح المباعة فيها للمخزون، ويترجع رصيد العميل زي ما كان قبلها. الحذف ده مش هينفع ترجع فيه.`
+                            );
+                            if (confirmed) onDeleteInvoice(inv.id);
+                          }}
+                          title="حذف الفاتورة"
+                          className="p-1.5 bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 hover:bg-red-100 rounded-lg transition"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </td>
                     </tr>
@@ -489,78 +507,171 @@ export const SalesPage: React.FC<SalesPageProps> = ({
         </div>
       )}
 
-      {/* Printable Invoice Receipt Modal */}
-      {selectedInvoiceForView && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-6 border border-slate-200 dark:border-slate-700 print:m-0 print:p-0">
-            <div className="flex items-center justify-between border-b pb-4 border-slate-200 dark:border-slate-700 print:hidden">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                فاتورة مبيعات أخشاب #{selectedInvoiceForView.invoice_number}
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="px-3.5 py-1.5 bg-amber-600 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span>طباعة الفاتورة</span>
-                </button>
-                <button onClick={() => setSelectedInvoiceForView(null)} className="text-slate-400 hover:text-slate-600">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Print Header */}
-            <div className="space-y-4">
-              <div className="text-center pb-4 border-b border-slate-200">
-                <h2 className="text-2xl font-black text-slate-900">شركة الدالي لتجارة الأخشاب</h2>
-                <p className="text-xs text-slate-500">متخصصون في توريد كافة أنواع الألواح الخشبية (MDF - كونتر - أبلكاش)</p>
-                <div className="text-xs font-mono font-bold mt-2 text-amber-700">
-                  رقم الفاتورة: {selectedInvoiceForView.invoice_number}
+      {/* Printable Invoice Receipt Modal — laid out to mirror the paper "بيان بيع" form */}
+      {selectedInvoiceForView && (() => {
+        const cust = customers.find((c) => c.id === selectedInvoiceForView.customer_id);
+        const items = selectedInvoiceForView.items || [];
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 print:static print:bg-transparent print:p-0">
+            <div
+              id="sales-invoice-print-area"
+              className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-700 print:m-0 print:p-0 print:max-w-none print:w-full print:shadow-none print:border-0 print:rounded-none"
+              dir="rtl"
+            >
+              <div className="flex items-center justify-between border-b pb-4 border-slate-200 dark:border-slate-700 print:hidden">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  فاتورة مبيعات أخشاب #{selectedInvoiceForView.invoice_number}
+                </h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="px-3.5 py-1.5 bg-amber-600 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>طباعة الفاتورة</span>
+                  </button>
+                  <button onClick={() => setSelectedInvoiceForView(null)} className="text-slate-400 hover:text-slate-600">
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 text-xs gap-2 text-slate-700">
-                <div>
-                  <span className="font-bold">العميل:</span>{' '}
-                  {customers.find((c) => c.id === selectedInvoiceForView.customer_id)?.name || 'عميل'}
+              {/* ===== Print Sheet (mirrors the paper بيان بيع layout) ===== */}
+              <div className="invoice-print-sheet text-slate-900 text-sm">
+                {/* Company header */}
+                <div className="text-center pb-2">
+                  <h2 className="text-2xl font-black">شركة الدالي لتجارة الأخشاب</h2>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    متخصصون في توريد كافة أنواع الألواح الخشبية (MDF - كونتر - أبلكاش)
+                  </p>
                 </div>
-                <div>
-                  <span className="font-bold">التاريخ:</span> {selectedInvoiceForView.invoice_date}
+                <div className="text-center border-y-2 border-slate-800 py-1.5 mb-3">
+                  <h1 className="text-lg font-black tracking-wide">فاتورة بيع</h1>
                 </div>
-              </div>
 
-              <table className="w-full text-xs text-right border border-slate-200">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="p-2 border">الصنف (اللوح الخشبي)</th>
-                    <th className="p-2 border">عدد الألواح</th>
-                    <th className="p-2 border">سعر اللوح</th>
-                    <th className="p-2 border">الإجمالي</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(selectedInvoiceForView.items || []).map((item, idx) => (
-                    <tr key={idx} className="border-b">
-                      <td className="p-2 border font-bold">{item.product_name_snapshot} ({item.wood_type_snapshot})</td>
-                      <td className="p-2 border text-center font-bold">{item.quantity_sheets} لوح</td>
-                      <td className="p-2 border font-mono">{item.unit_price} EGP</td>
-                      <td className="p-2 border font-mono font-bold">{item.line_total} EGP</td>
+                {/* Top info boxes: رقم البيان / تاريخ البيان on the right, customer info on the left — like the paper form */}
+                <div className="flex flex-wrap justify-between gap-3 mb-3">
+                  <div className="border border-slate-400 rounded-md overflow-hidden text-xs w-44">
+                    <div className="flex justify-between px-2 py-1 border-b border-slate-400 bg-slate-50">
+                      <span className="font-bold">رقم البيان:</span>
+                      <span className="font-mono">{selectedInvoiceForView.invoice_number}</span>
+                    </div>
+                    <div className="flex justify-between px-2 py-1">
+                      <span className="font-bold">تاريخ البيان:</span>
+                      <span className="font-mono">{selectedInvoiceForView.invoice_date}</span>
+                    </div>
+                  </div>
+
+                  <div className="text-xs space-y-1 text-left">
+                    <div><span className="font-bold">اسم العميل:</span> {cust?.name || 'عميل'}</div>
+                    <div><span className="font-bold">كود العميل:</span> {cust?.code || '-'}</div>
+                    <div><span className="font-bold">العنوان:</span> {cust?.address || '-'}</div>
+                    <div><span className="font-bold">التليفون:</span> {cust?.mobile || '-'}</div>
+                  </div>
+                </div>
+
+                <div className="flex justify-between text-[11px] text-slate-600 border-b border-slate-300 pb-1.5 mb-2">
+                  <span>عملة الفاتورة: ج.م</span>
+                  <span>الحالة: {selectedInvoiceForView.status === 'approved' ? 'معتمدة ✅' : selectedInvoiceForView.status === 'draft' ? 'مسودة' : 'ملغاة'}</span>
+                </div>
+
+                {/* Items table — same column order as the paper form */}
+                <table className="w-full text-xs border-collapse border border-slate-400">
+                  <thead>
+                    <tr className="bg-slate-100">
+                      <th className="border border-slate-400 p-1.5 font-bold">م</th>
+                      <th className="border border-slate-400 p-1.5 font-bold">كود الصنف</th>
+                      <th className="border border-slate-400 p-1.5 font-bold">الصنف</th>
+                      <th className="border border-slate-400 p-1.5 font-bold">الوحدة</th>
+                      <th className="border border-slate-400 p-1.5 font-bold">الكمية</th>
+                      <th className="border border-slate-400 p-1.5 font-bold">سعر الوحدة</th>
+                      <th className="border border-slate-400 p-1.5 font-bold">الإجمالي</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {items.map((item, idx) => (
+                      <tr key={idx}>
+                        <td className="border border-slate-400 p-1.5 text-center">{idx + 1}</td>
+                        <td className="border border-slate-400 p-1.5 text-center font-mono">{item.product_id ? item.product_id.slice(0, 6) : '-'}</td>
+                        <td className="border border-slate-400 p-1.5 font-bold">
+                          {item.product_name_snapshot}
+                          {item.wood_type_snapshot ? ` (${item.wood_type_snapshot})` : ''}
+                        </td>
+                        <td className="border border-slate-400 p-1.5 text-center">لوح</td>
+                        <td className="border border-slate-400 p-1.5 text-center">{item.quantity_sheets}</td>
+                        <td className="border border-slate-400 p-1.5 text-center font-mono">{item.unit_price.toLocaleString()}</td>
+                        <td className="border border-slate-400 p-1.5 text-center font-mono font-bold">{item.line_total.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                    {items.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="border border-slate-400 p-3 text-center text-slate-400">لا توجد أصناف</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
 
-              <div className="space-y-1 text-xs text-left pt-2 border-t">
-                <div className="font-bold">الإجمالي: {selectedInvoiceForView.total.toLocaleString()} ج.م</div>
-                <div className="text-emerald-700 font-bold">المدفوع كاش: {selectedInvoiceForView.paid_amount.toLocaleString()} ج.م</div>
-                <div className="text-red-600 font-black">المتبقي دين: {selectedInvoiceForView.remaining_balance.toLocaleString()} ج.م</div>
+                {/* Totals box — right-aligned like the paper form's اجمالي البيان / الخصم / الصافي box */}
+                <div className="flex justify-start mt-3">
+                  <table className="text-xs border-collapse border border-slate-400 w-56">
+                    <tbody>
+                      <tr>
+                        <td className="border border-slate-400 p-1.5 font-bold bg-slate-50">اجمالي البيان</td>
+                        <td className="border border-slate-400 p-1.5 text-left font-mono">{selectedInvoiceForView.subtotal.toLocaleString()}</td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-400 p-1.5 font-bold bg-slate-50">اجمالي قيمة الخصم</td>
+                        <td className="border border-slate-400 p-1.5 text-left font-mono">{selectedInvoiceForView.discount.toLocaleString()}</td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-400 p-1.5 font-bold bg-slate-50">صافي قيمة البيان</td>
+                        <td className="border border-slate-400 p-1.5 text-left font-mono font-black">{selectedInvoiceForView.total.toLocaleString()}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Amount in words — "فقط وقدره ... لا غير" */}
+                <div className="text-[11px] mt-3 pt-2 border-t border-slate-300">
+                  <span className="font-bold">فقط وقدره:</span> {amountToArabicWords(selectedInvoiceForView.total)}
+                </div>
+
+                {/* Paid / remaining */}
+                <div className="flex justify-between text-xs mt-2">
+                  <span className="text-emerald-700 font-bold">المدفوع: {selectedInvoiceForView.paid_amount.toLocaleString()} ج.م</span>
+                  <span className="text-red-600 font-black">المتبقي (دين): {selectedInvoiceForView.remaining_balance.toLocaleString()} ج.م</span>
+                </div>
+
+                {selectedInvoiceForView.notes && (
+                  <div className="text-[11px] text-slate-500 mt-2">ملاحظات: {selectedInvoiceForView.notes}</div>
+                )}
+
+                {/* Signatures — matches the paper's المحاسب / أمين المخزن footer */}
+                <div className="flex justify-between mt-10 pt-4 text-xs">
+                  <div className="text-center w-40">
+                    <div className="font-bold mb-8">أمين المخزن</div>
+                    <div className="border-t border-slate-400" />
+                  </div>
+                  <div className="text-center w-40">
+                    <div className="font-bold mb-8">المحاسب</div>
+                    <div className="border-t border-slate-400" />
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* A4 print rules — applied only when printing, so the on-screen modal is unaffected */}
+            <style>{`
+              @media print {
+                @page { size: A4; margin: 12mm; }
+                body * { visibility: hidden; }
+                #sales-invoice-print-area, #sales-invoice-print-area * { visibility: visible; }
+                #sales-invoice-print-area { position: absolute; inset: 0; }
+              }
+            `}</style>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

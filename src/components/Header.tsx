@@ -1,11 +1,12 @@
 import React from 'react';
-import { Trees, Shield, Globe, RefreshCw } from 'lucide-react';
+import { Trees, Shield, Globe, RefreshCw, LogOut } from 'lucide-react';
 
 interface HeaderProps {
   language: 'ar' | 'en';
   onLanguageChange: (lang: 'ar' | 'en') => void;
   currentUser: { name: string; role: 'admin' | 'sales' | 'warehouse' };
   onUserChange: (user: { name: string; role: 'admin' | 'sales' | 'warehouse' }) => void;
+  onLogout: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -13,6 +14,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLanguageChange,
   currentUser,
   onUserChange,
+  onLogout,
 }) => {
   const toggleRole = () => {
     let nextRole: 'admin' | 'sales' | 'warehouse' = 'admin';
@@ -75,6 +77,16 @@ export const Header: React.FC<HeaderProps> = ({
               <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
             </button>
           </div>
+
+          {/* Logout */}
+          <button
+            onClick={onLogout}
+            title={language === 'ar' ? 'تسجيل خروج' : 'Logout'}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-red-900/60 text-xs font-semibold text-slate-200 hover:text-red-200 border border-slate-700 hover:border-red-800 transition"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>{language === 'ar' ? 'تسجيل خروج' : 'Logout'}</span>
+          </button>
         </div>
       </div>
     </header>

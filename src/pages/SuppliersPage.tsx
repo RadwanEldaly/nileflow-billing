@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Supplier, PurchaseInvoice, FinancialTransaction } from '../types';
-import { Search, Plus, Truck, FileText, X } from 'lucide-react';
+import { Search, Plus, Truck, FileText, X, Edit3, Trash2 } from 'lucide-react';
 
 interface SuppliersPageProps {
   suppliers: Supplier[];
@@ -8,6 +8,8 @@ interface SuppliersPageProps {
   transactions: FinancialTransaction[];
   language: 'ar' | 'en';
   onAddSupplier: (supplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at' | 'balance'>) => void;
+  onUpdateSupplier: (id: string, updates: Partial<Supplier>) => void;
+  onDeleteSupplier: (id: string) => void;
 }
 
 export const SuppliersPage: React.FC<SuppliersPageProps> = ({
@@ -16,10 +18,13 @@ export const SuppliersPage: React.FC<SuppliersPageProps> = ({
   transactions,
   language,
   onAddSupplier,
+  onUpdateSupplier,
+  onDeleteSupplier,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSupplierForLedger, setSelectedSupplierForLedger] = useState<Supplier | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
 
   const [formData, setFormData] = useState({
     code: '',
@@ -40,16 +45,49 @@ export const SuppliersPage: React.FC<SuppliersPageProps> = ({
   const handleSubmitNew = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name) return;
-    const nextCode = formData.code || `SUP-${String(suppliers.length + 1).padStart(3, '0')}`;
-    onAddSupplier({
-      code: nextCode,
-      name: formData.name,
-      mobile: formData.mobile,
-      address: formData.address,
-      notes: formData.notes,
-    });
+
+    if (editingSupplier) {
+      onUpdateSupplier(editingSupplier.id, {
+        name: formData.name,
+        mobile: formData.mobile,
+        address: formData.address,
+        notes: formData.notes,
+      });
+      setEditingSupplier(null);
+    } else {
+      const nextCode = formData.code || `SUP-${String(suppliers.length + 1).padStart(3, '0')}`;
+      onAddSupplier({
+        code: nextCode,
+        name: formData.name,
+        mobile: formData.mobile,
+        address: formData.address,
+        notes: formData.notes,
+      });
+    }
+
     setFormData({ code: '', name: '', mobile: '', address: '', notes: '' });
     setIsAddModalOpen(false);
+  };
+
+  const handleEditClick = (sup: Supplier) => {
+    setEditingSupplier(sup);
+    setFormData({
+      code: sup.code,
+      name: sup.name,
+      mobile: sup.mobile || '',
+      address: sup.address || '',
+      notes: sup.notes || '',
+    });
+    setIsAddModalOpen(true);
+  };
+
+  const handleDeleteClick = (sup: Supplier) => {
+    const confirmed = window.confirm(
+      `متأكد إنك عايز تمسح المورد "${sup.name}" نهائيًا؟ الحذف ده مش هينفع ترجع فيه.`
+    );
+    if (confirmed) {
+      onDeleteSupplier(sup.id);
+    }
   };
 
   const getSupplierLedger = (sup: Supplier) => {
@@ -110,7 +148,11 @@ export const SuppliersPage: React.FC<SuppliersPageProps> = ({
         </div>
 
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => {
+            setEditingSupplier(null);
+            setFormData({ code: '', name: '', mobile: '', address: '', notes: '' });
+            setIsAddModalOpen(true);
+          }}
           className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-sm transition"
         >
           <Plus className="w-4 h-4" />
@@ -143,8 +185,10 @@ export const SuppliersPage: React.FC<SuppliersPageProps> = ({
                   <th className="px-6 py-3.5">اسم المورد</th>
                   <th className="px-6 py-3.5">رقم التلفون</th>
                   <th className="px-6 py-3.5">العنوان</th>
+                  <th className="px-6 py-3.5">تاريخ الإضافة</th>
                   <th className="px-6 py-3.5">المستحق للمورد (دائن)</th>
                   <th className="px-6 py-3.5 text-center">كشف الحساب</th>
+                  <th className="px-6 py-3.5 text-center">إجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -156,6 +200,9 @@ export const SuppliersPage: React.FC<SuppliersPageProps> = ({
                       <td className="px-6 py-4 font-extrabold text-slate-900 dark:text-white">{sup.name}</td>
                       <td className="px-6 py-4 font-mono text-slate-600 dark:text-slate-300 dir-ltr">{sup.mobile || '-'}</td>
                       <td className="px-6 py-4 text-slate-500">{sup.address || '-'}</td>
+                      <td className="px-6 py-4 font-mono text-xs text-slate-500">
+                        {sup.created_at ? sup.created_at.slice(0, 10) : '-'}
+                      </td>
                       <td className="px-6 py-4 font-black">
                         <span className={ledger.netPayableBalance > 0 ? 'text-indigo-600 font-black' : 'text-slate-600'}>
                           {ledger.netPayableBalance.toLocaleString()} EGP
@@ -169,6 +216,24 @@ export const SuppliersPage: React.FC<SuppliersPageProps> = ({
                           <FileText className="w-3.5 h-3.5" />
                           <span>عرض كشف الحساب</span>
                         </button>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => handleEditClick(sup)}
+                            title="تعديل"
+                            className="p-1.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 rounded-lg transition"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(sup)}
+                            title="حذف"
+                            className="p-1.5 bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 hover:bg-red-100 rounded-lg transition"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -190,8 +255,16 @@ export const SuppliersPage: React.FC<SuppliersPageProps> = ({
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-700">
             <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-slate-700">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">إضافة مورد جديد - شركة الدالي</h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                {editingSupplier ? `تعديل بيانات المورد: ${editingSupplier.name}` : 'إضافة مورد جديد - شركة الدالي'}
+              </h3>
+              <button
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setEditingSupplier(null);
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -240,7 +313,10 @@ export const SuppliersPage: React.FC<SuppliersPageProps> = ({
               <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    setEditingSupplier(null);
+                  }}
                   className="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-700"
                 >
                   إلغاء
@@ -249,7 +325,7 @@ export const SuppliersPage: React.FC<SuppliersPageProps> = ({
                   type="submit"
                   className="px-4 py-2 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-600 text-white"
                 >
-                  حفظ المورد
+                  {editingSupplier ? 'حفظ التعديلات' : 'حفظ المورد'}
                 </button>
               </div>
             </form>

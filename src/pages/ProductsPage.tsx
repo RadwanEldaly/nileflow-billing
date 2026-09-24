@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Product, Supplier } from '../types';
-import { Search, Plus, Trees, Edit3, X, FileSpreadsheet } from 'lucide-react';
+import { Search, Plus, Trees, Edit3, Trash2, X, FileSpreadsheet } from 'lucide-react';
 
 interface ProductsPageProps {
   products: Product[];
@@ -8,6 +8,7 @@ interface ProductsPageProps {
   language: 'ar' | 'en';
   onAddProduct: (product: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => void;
   onUpdateProduct: (id: string, updates: Partial<Product>) => void;
+  onDeleteProduct: (id: string) => void;
   onNavigateToImport: () => void;
 }
 
@@ -17,6 +18,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   language,
   onAddProduct,
   onUpdateProduct,
+  onDeleteProduct,
   onNavigateToImport,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,7 +26,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  // Form states
+  // واجهة نظيفة تماماً كما طلبت
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -32,12 +34,12 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     size: '',
     color: '',
     category: 'ألواح أخشاب',
-    purchase_price: '',
+    received_date: new Date().toISOString().slice(0, 10),
     selling_price: '',
     stock_quantity: '',
     min_stock_level: '10',
-    supplier_id: '',
     notes: '',
+    purchasing_price: '',
   });
 
   const woodTypes = Array.from(new Set(products.map((p) => p.wood_type).filter(Boolean)));
@@ -55,46 +57,56 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
 
   const handleSubmitNew = (e: React.FormEvent) => {
     e.preventDefault();
-    const pPrice = parseFloat(formData.purchase_price) || 0;
     const sPrice = parseFloat(formData.selling_price) || 0;
     const stockQty = parseFloat(formData.stock_quantity) || 0;
     const minStock = parseFloat(formData.min_stock_level) || 10;
 
-    if (!formData.name || sPrice <= 0) return;
+    if (!formData.name || sPrice <= 0) {
+      alert("يرجى التأكد من إدخال اسم المنتج وسعر البيع.");
+      return;
+    }
 
     if (editingProduct) {
-      onUpdateProduct(editingProduct.id, {
+      // تنظيف الحقول عند التحديث لتجنب إرسال نصوص فارغة
+      // ملاحظة: received_date مش موجود في جدول products على Supabase — بنعتمد على created_at
+      const updates: Partial<Product> = {
         code: formData.code || editingProduct.code,
         name: formData.name,
         wood_type: formData.wood_type,
-        size: formData.size || undefined,
-        color: formData.color || undefined,
         category: formData.category,
-        purchase_price: pPrice,
         selling_price: sPrice,
         stock_quantity: stockQty,
         min_stock_level: minStock,
-        supplier_id: formData.supplier_id || undefined,
-        notes: formData.notes,
-      });
+      };
+
+      if (formData.size) updates.size = formData.size;
+      if (formData.color) updates.color = formData.color;
+      if (formData.notes) updates.notes = formData.notes;
+
+      onUpdateProduct(editingProduct.id, updates);
       setEditingProduct(null);
     } else {
-      const generatedCode = formData.code || `WOOD-${String(products.length + 1).padStart(4, '0')}`;
-      onAddProduct({
+      // توليد كود فريد لمنع خطأ التكرار في قاعدة البيانات
+      const generatedCode = formData.code || `WOOD-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      // مابنتبعتش received_date لأن العمود مش موجود في الـ DB — created_at بيتسجل تلقائياً
+      const newProd: Omit<Product, 'id' | 'created_at' | 'updated_at'> = {
         code: generatedCode,
         name: formData.name,
         wood_type: formData.wood_type,
-        size: formData.size || undefined,
-        color: formData.color || undefined,
         category: formData.category,
-        purchase_price: pPrice,
+        purchase_price: 0,
         selling_price: sPrice,
         stock_quantity: stockQty,
         min_stock_level: minStock,
-        supplier_id: formData.supplier_id || undefined,
-        notes: formData.notes,
         is_active: true,
-      });
+      };
+
+      if (formData.size) newProd.size = formData.size;
+      if (formData.color) newProd.color = formData.color;
+      if (formData.notes) newProd.notes = formData.notes;
+
+      onAddProduct(newProd);
     }
 
     setFormData({
@@ -104,12 +116,12 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       size: '',
       color: '',
       category: 'ألواح أخشاب',
-      purchase_price: '',
+      received_date: new Date().toISOString().slice(0, 10),
       selling_price: '',
       stock_quantity: '',
       min_stock_level: '10',
-      supplier_id: '',
       notes: '',
+      purchasing_price: '',
     });
     setIsAddModalOpen(false);
   };
@@ -123,19 +135,27 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       size: prod.size || '',
       color: prod.color || '',
       category: prod.category || 'ألواح أخشاب',
-      purchase_price: String(prod.purchase_price),
+      received_date: prod.received_date || '',
       selling_price: String(prod.selling_price),
       stock_quantity: String(prod.stock_quantity),
       min_stock_level: String(prod.min_stock_level || 10),
-      supplier_id: prod.supplier_id || '',
       notes: prod.notes || '',
+      purchasing_price: String(prod.purchase_price),
     });
     setIsAddModalOpen(true);
   };
 
+  const handleDeleteClick = (prod: Product) => {
+    const confirmed = window.confirm(
+      `متأكد إنك عايز تمسح "${prod.name}" نهائيًا؟ الحذف ده مش هينفع ترجع فيه.`
+    );
+    if (confirmed) {
+      onDeleteProduct(prod.id);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
@@ -160,6 +180,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
           <button
             onClick={() => {
               setEditingProduct(null);
+              const today = new Date().toISOString().slice(0, 10);
               setFormData({
                 code: '',
                 name: '',
@@ -167,12 +188,12 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                 size: '',
                 color: '',
                 category: 'ألواح أخشاب',
-                purchase_price: '',
+                received_date: today,
                 selling_price: '',
                 stock_quantity: '',
                 min_stock_level: '10',
-                supplier_id: '',
                 notes: '',
+                purchasing_price: '',
               });
               setIsAddModalOpen(true);
             }}
@@ -184,7 +205,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         </div>
       </div>
 
-      {/* Filter Bar */}
       <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="w-4 h-4 absolute top-3 right-3 text-slate-400 rtl:right-3 ltr:left-3" />
@@ -213,7 +233,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         )}
       </div>
 
-      {/* Products Table */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
         {filteredProducts.length > 0 ? (
           <div className="overflow-x-auto">
@@ -225,7 +244,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   <th className="px-6 py-3.5">نوع الخشب</th>
                   <th className="px-6 py-3.5">المقاس</th>
                   <th className="px-6 py-3.5">اللون</th>
-                  <th className="px-6 py-3.5">سعر الشراء</th>
+                  <th className="px-6 py-3.5">تاريخ الإضافة</th>
                   <th className="px-6 py-3.5">سعر البيع</th>
                   <th className="px-6 py-3.5">رصيد الألواح الحالي</th>
                   <th className="px-6 py-3.5 text-center">إجراءات</th>
@@ -245,7 +264,15 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                       </td>
                       <td className="px-6 py-4 font-mono text-xs text-slate-600 dark:text-slate-300">{p.size || '—'}</td>
                       <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-300">{p.color || '—'}</td>
-                      <td className="px-6 py-4 font-mono text-slate-500">{p.purchase_price} EGP</td>
+                      <td className="px-6 py-4 font-mono text-xs text-slate-500">
+                        {p.created_at
+                          ? new Date(p.created_at).toLocaleDateString('ar-EG', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                            })
+                          : '—'}
+                      </td>
                       <td className="px-6 py-4 font-extrabold text-amber-700 dark:text-amber-400">{p.selling_price} EGP</td>
                       <td className="px-6 py-4 font-black">
                         <span className={`px-2.5 py-1 rounded-lg ${isLowStock ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300' : 'text-slate-900 dark:text-white'}`}>
@@ -253,12 +280,22 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => handleEditClick(p)}
-                          className="p-1.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 rounded-lg transition"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => handleEditClick(p)}
+                            title="تعديل"
+                            className="p-1.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 rounded-lg transition"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(p)}
+                            title="حذف"
+                            className="p-1.5 bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 hover:bg-red-100 rounded-lg transition"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -287,7 +324,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         )}
       </div>
 
-      {/* Modal Add / Edit Product */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-700">
@@ -375,14 +411,13 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    سعر الشراء (للّوح)
+                    تاريخ الإضافة
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
-                    value={formData.purchase_price}
-                    onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-bold"
+                    type="text"
+                    disabled
+                    value="يُسجَّل تلقائياً عند الحفظ"
+                    className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-500 cursor-not-allowed"
                   />
                 </div>
 
@@ -404,7 +439,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    رصيد الألواح الأولي
+                    {editingProduct ? 'عدد الألواح (قابل للتعديل)' : 'رصيد الألواح الأولي'}
                   </label>
                   <input
                     type="number"

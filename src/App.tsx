@@ -11,6 +11,7 @@ import {
   FinancialTransaction,
 } from './types';
 import { Header } from './components/Header';
+import { LoginScreen } from './components/LoginScreen';
 import { Navigation, NavTab } from './components/Navigation';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProductsPage } from './pages/ProductsPage';
@@ -28,6 +29,18 @@ export function App() {
   const [currentUser, setCurrentUser] = useState({ name: 'إدارة شركة الدالي (Admin)', role: 'admin' as const });
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    if (localStorage.getItem('nileflow_auth') === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('nileflow_auth');
+    setIsAuthenticated(false);
+  };
 
   // Application Central Data States
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -92,27 +105,15 @@ export function App() {
   };
 
   // HANDLERS (Supabase Integrated)
-  // يرجع المنتج اللي اتضاف فعلاً (أو null لو فشلت الإضافة) عشان يستخدم فوراً
-  // في شاشات تانية زي فاتورة المشتريات (إضافة صنف جديد أثناء إدخال الفاتورة).
-  const handleAddProduct = async (
-    newProdData: Omit<Product, 'id' | 'created_at' | 'updated_at'>
-  ): Promise<Product | null> => {
+  const handleAddProduct = async (newProdData: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
     const { data, error } = await supabase.from('products').insert([newProdData]).select();
     if (data && data[0]) {
-      setProducts((prev) => [data[0], ...prev]);
-      return data[0];
-    }
-
-    console.error('Error adding product:', error);
-    // رسالة واضحة للمستخدم بدل ما تفشل الإضافة بصمت
-    if (error?.code === '23505') {
-      alert(
-        `⚠️ الصنف موجود بالفعل بنفس الكود والمقاس واللون (${newProdData.code} - ${newProdData.size || 'بدون مقاس'} - ${newProdData.color || 'بدون لون'}).\nلو عايز تضيف كمية لنفس الصنف، عدّل رصيده بدل إضافة صنف جديد.`
-      );
+      setProducts([data[0], ...products]);
     } else {
-      alert(`⚠️ حصل خطأ أثناء إضافة الصنف: ${error?.message || 'خطأ غير معروف'}`);
+      console.error('Error adding product:', error);
+      const msg = error?.message || 'حدث خطأ غير معروف';
+      alert(language === 'ar' ? `فشل إضافة الصنف:\n${msg}` : `Failed to add product:\n${msg}`);
     }
-    return null;
   };
 
   const handleUpdateProduct = async (id: string, updates: Partial<Product>) => {
@@ -121,7 +122,53 @@ export function App() {
       setProducts(products.map((p) => (p.id === id ? data[0] : p)));
     } else {
       console.error('Error updating product:', error);
-      alert(`⚠️ حصل خطأ أثناء تعديل الصنف: ${error?.message || 'خطأ غير معروف'}`);
+      const msg = error?.message || 'حدث خطأ غير معروف';
+      alert(language === 'ar' ? `فشل تحديث الصنف:\n${msg}` : `Failed to update product:\n${msg}`);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (!error) {
+      setProducts(products.filter((p) => p.id !== id));
+    } else {
+      console.error('Error deleting product:', error);
+    }
+  };
+
+  const handleUpdateCustomer = async (id: string, updates: Partial<Customer>) => {
+    const { data, error } = await supabase.from('customers').update(updates).eq('id', id).select();
+    if (data && data[0]) {
+      setCustomers(customers.map((c) => (c.id === id ? data[0] : c)));
+    } else {
+      console.error('Error updating customer:', error);
+    }
+  };
+
+  const handleDeleteCustomer = async (id: string) => {
+    const { error } = await supabase.from('customers').delete().eq('id', id);
+    if (!error) {
+      setCustomers(customers.filter((c) => c.id !== id));
+    } else {
+      console.error('Error deleting customer:', error);
+    }
+  };
+
+  const handleUpdateSupplier = async (id: string, updates: Partial<Supplier>) => {
+    const { data, error } = await supabase.from('suppliers').update(updates).eq('id', id).select();
+    if (data && data[0]) {
+      setSuppliers(suppliers.map((s) => (s.id === id ? data[0] : s)));
+    } else {
+      console.error('Error updating supplier:', error);
+    }
+  };
+
+  const handleDeleteSupplier = async (id: string) => {
+    const { error } = await supabase.from('suppliers').delete().eq('id', id);
+    if (!error) {
+      setSuppliers(suppliers.filter((s) => s.id !== id));
+    } else {
+      console.error('Error deleting supplier:', error);
     }
   };
 
@@ -259,7 +306,86 @@ export function App() {
       }
     } else {
       console.error('Error creating purchase invoice:', invError);
-      alert(`⚠️ حصل خطأ أثناء حفظ فاتورة الشراء: ${invError?.message || 'خطأ غير معروف'}`);
+    }
+  };
+
+  const handleDeleteSalesInvoice = async (invoiceId: string) => {
+    const invoice = salesInvoices.find((i) => i.id === invoiceId);
+    if (!invoice) return;
+
+    // Reverse stock: give back every sheet this invoice had deducted
+    if (invoice.items) {
+      for (const item of invoice.items) {
+        if (item.product_id) {
+          await handleAddStockMovement({
+            product_id: item.product_id,
+            product_name: item.product_name_snapshot,
+            warehouse_id: invoice.warehouse_id,
+            movement_type: 'sales_return',
+            quantity: item.quantity_sheets,
+            reference_id: invoice.invoice_number,
+            notes: `إلغاء/حذف فاتورة بيع رقم ${invoice.invoice_number}`,
+          });
+        }
+      }
+    }
+
+    // Reverse the customer's balance (undo what this invoice had added as debt)
+    const cust = customers.find((c) => c.id === invoice.customer_id);
+    if (cust) {
+      const updatedBalance = (cust.balance || 0) - invoice.remaining_balance;
+      const { data: updatedCust } = await supabase.from('customers').update({ balance: updatedBalance }).eq('id', cust.id).select();
+      if (updatedCust && updatedCust[0]) {
+        setCustomers(customers.map((c) => (c.id === cust.id ? updatedCust[0] : c)));
+      }
+    }
+
+    // Delete the invoice (sales_invoice_items cascade-delete automatically)
+    const { error } = await supabase.from('sales_invoices').delete().eq('id', invoiceId);
+    if (!error) {
+      setSalesInvoices(salesInvoices.filter((i) => i.id !== invoiceId));
+    } else {
+      console.error('Error deleting sales invoice:', error);
+    }
+  };
+
+  const handleDeletePurchaseInvoice = async (invoiceId: string) => {
+    const invoice = purchaseInvoices.find((i) => i.id === invoiceId);
+    if (!invoice) return;
+
+    // Reverse stock: remove back out every sheet this invoice had added
+    if (invoice.items) {
+      for (const item of invoice.items) {
+        if (item.product_id) {
+          await handleAddStockMovement({
+            product_id: item.product_id,
+            product_name: item.product_name_snapshot,
+            warehouse_id: invoice.warehouse_id,
+            movement_type: 'purchase_return',
+            quantity: -item.quantity_sheets,
+            reference_id: invoice.invoice_number,
+            notes: `إلغاء/حذف فاتورة شراء رقم ${invoice.invoice_number}`,
+          });
+        }
+      }
+    }
+
+    // Reverse the supplier's balance (undo what this invoice had added as payable)
+    const sup = suppliers.find((s) => s.id === invoice.supplier_id);
+    if (sup) {
+      const updatedBalance = (sup.balance || 0) - invoice.remaining_balance;
+      const { data: updatedSup } = await supabase.from('suppliers').update({ balance: updatedBalance }).eq('id', sup.id).select();
+      if (updatedSup && updatedSup[0]) {
+        setSuppliers(suppliers.map((s) => (s.id === sup.id ? updatedSup[0] : s)));
+      }
+    }
+
+    // Delete the invoice (purchase_invoice_items cascade-delete automatically)
+    const { error } = await supabase.from('purchase_invoices').delete().eq('id', invoiceId);
+    if (!error) {
+      setPurchaseInvoices(purchaseInvoices.filter((i) => i.id !== invoiceId));
+    } else {
+      console.error('Error deleting purchase invoice:', error);
     }
   };
 
@@ -321,6 +447,10 @@ export function App() {
     if (data) setCustomers(data);
   };
 
+  if (!isAuthenticated) {
+    return <LoginScreen language={language} onLoginSuccess={() => setIsAuthenticated(true)} />;
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
@@ -337,6 +467,7 @@ export function App() {
         onLanguageChange={setLanguage}
         currentUser={currentUser as any}
         onUserChange={setCurrentUser as any}
+        onLogout={handleLogout}
       />
 
       {/* Navigation */}
@@ -372,6 +503,7 @@ export function App() {
             language={language}
             onAddProduct={handleAddProduct}
             onUpdateProduct={handleUpdateProduct}
+            onDeleteProduct={handleDeleteProduct}
             onNavigateToImport={() => setActiveTab('import')}
           />
         )}
@@ -394,6 +526,7 @@ export function App() {
             warehouses={warehouses}
             language={language}
             onCreateInvoice={handleCreateSalesInvoice}
+            onDeleteInvoice={handleDeleteSalesInvoice}
             isCreateOpenInitially={isSalesModalOpenInitially}
           />
         )}
@@ -406,7 +539,7 @@ export function App() {
             warehouses={warehouses}
             language={language}
             onCreatePurchase={handleCreatePurchaseInvoice}
-            onAddProduct={handleAddProduct}
+            onDeleteInvoice={handleDeletePurchaseInvoice}
           />
         )}
 
@@ -417,6 +550,8 @@ export function App() {
             transactions={transactions}
             language={language}
             onAddCustomer={handleAddCustomer}
+            onUpdateCustomer={handleUpdateCustomer}
+            onDeleteCustomer={handleDeleteCustomer}
           />
         )}
 
@@ -427,6 +562,8 @@ export function App() {
             transactions={transactions}
             language={language}
             onAddSupplier={handleAddSupplier}
+            onUpdateSupplier={handleUpdateSupplier}
+            onDeleteSupplier={handleDeleteSupplier}
           />
         )}
 

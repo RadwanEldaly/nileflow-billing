@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Customer, SalesInvoice, FinancialTransaction } from '../types';
-import { Search, Plus, Phone, MapPin, FileText, DollarSign, X, CheckCircle2, User } from 'lucide-react';
+import { Search, Plus, Phone, MapPin, FileText, DollarSign, X, CheckCircle2, User, Edit3, Trash2 } from 'lucide-react';
 
 interface CustomersPageProps {
   customers: Customer[];
@@ -8,6 +8,8 @@ interface CustomersPageProps {
   transactions: FinancialTransaction[];
   language: 'ar' | 'en';
   onAddCustomer: (customer: Omit<Customer, 'id' | 'created_at' | 'updated_at' | 'balance'>) => void;
+  onUpdateCustomer: (id: string, updates: Partial<Customer>) => void;
+  onDeleteCustomer: (id: string) => void;
 }
 
 export const CustomersPage: React.FC<CustomersPageProps> = ({
@@ -16,10 +18,13 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
   transactions,
   language,
   onAddCustomer,
+  onUpdateCustomer,
+  onDeleteCustomer,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomerForLedger, setSelectedCustomerForLedger] = useState<Customer | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
   const [formData, setFormData] = useState({
     code: '',
@@ -41,16 +46,49 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
   const handleSubmitNew = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.mobile) return;
-    const nextCode = formData.code || `CUST-${String(customers.length + 1).padStart(3, '0')}`;
-    onAddCustomer({
-      code: nextCode,
-      name: formData.name,
-      mobile: formData.mobile,
-      address: formData.address,
-      notes: formData.notes,
-    });
+
+    if (editingCustomer) {
+      onUpdateCustomer(editingCustomer.id, {
+        name: formData.name,
+        mobile: formData.mobile,
+        address: formData.address,
+        notes: formData.notes,
+      });
+      setEditingCustomer(null);
+    } else {
+      const nextCode = formData.code || `CUST-${String(customers.length + 1).padStart(3, '0')}`;
+      onAddCustomer({
+        code: nextCode,
+        name: formData.name,
+        mobile: formData.mobile,
+        address: formData.address,
+        notes: formData.notes,
+      });
+    }
+
     setFormData({ code: '', name: '', mobile: '', address: '', notes: '' });
     setIsAddModalOpen(false);
+  };
+
+  const handleEditClick = (cust: Customer) => {
+    setEditingCustomer(cust);
+    setFormData({
+      code: cust.code,
+      name: cust.name,
+      mobile: cust.mobile,
+      address: cust.address || '',
+      notes: cust.notes || '',
+    });
+    setIsAddModalOpen(true);
+  };
+
+  const handleDeleteClick = (cust: Customer) => {
+    const confirmed = window.confirm(
+      `متأكد إنك عايز تمسح العميل "${cust.name}" نهائيًا؟ الحذف ده مش هينفع ترجع فيه.`
+    );
+    if (confirmed) {
+      onDeleteCustomer(cust.id);
+    }
   };
 
   // Build Account Statement (كشف حساب) for selected customer
@@ -113,7 +151,11 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
         </div>
 
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => {
+            setEditingCustomer(null);
+            setFormData({ code: '', name: '', mobile: '', address: '', notes: '' });
+            setIsAddModalOpen(true);
+          }}
           className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-sm transition"
         >
           <Plus className="w-4 h-4" />
@@ -146,8 +188,10 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
                   <th className="px-6 py-3.5">اسم العميل</th>
                   <th className="px-6 py-3.5">رقم التلفون</th>
                   <th className="px-6 py-3.5">العنوان</th>
+                  <th className="px-6 py-3.5">تاريخ الإضافة</th>
                   <th className="px-6 py-3.5">الرصيد المستحق (دين)</th>
                   <th className="px-6 py-3.5 text-center">كشف الحساب</th>
+                  <th className="px-6 py-3.5 text-center">إجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -159,6 +203,9 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
                       <td className="px-6 py-4 font-extrabold text-slate-900 dark:text-white">{cust.name}</td>
                       <td className="px-6 py-4 font-mono text-slate-600 dark:text-slate-300 dir-ltr">{cust.mobile}</td>
                       <td className="px-6 py-4 text-slate-500">{cust.address || '-'}</td>
+                      <td className="px-6 py-4 font-mono text-xs text-slate-500">
+                        {cust.created_at ? cust.created_at.slice(0, 10) : '-'}
+                      </td>
                       <td className="px-6 py-4 font-black">
                         <span className={ledger.netDebtBalance > 0 ? 'text-red-600 font-black' : 'text-emerald-600'}>
                           {ledger.netDebtBalance.toLocaleString()} EGP
@@ -172,6 +219,24 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
                           <FileText className="w-3.5 h-3.5" />
                           <span>عرض كشف الحساب</span>
                         </button>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => handleEditClick(cust)}
+                            title="تعديل"
+                            className="p-1.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 rounded-lg transition"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(cust)}
+                            title="حذف"
+                            className="p-1.5 bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 hover:bg-red-100 rounded-lg transition"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -193,8 +258,16 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-700">
             <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-slate-700">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">إضافة عميل جديد - شركة الدالي</h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                {editingCustomer ? `تعديل بيانات العميل: ${editingCustomer.name}` : 'إضافة عميل جديد - شركة الدالي'}
+              </h3>
+              <button
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setEditingCustomer(null);
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -244,7 +317,10 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
               <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    setEditingCustomer(null);
+                  }}
                   className="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-700"
                 >
                   إلغاء
@@ -253,7 +329,7 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
                   type="submit"
                   className="px-4 py-2 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white"
                 >
-                  حفظ العميل
+                  {editingCustomer ? 'حفظ التعديلات' : 'حفظ العميل'}
                 </button>
               </div>
             </form>

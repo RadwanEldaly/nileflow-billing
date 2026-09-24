@@ -60,6 +60,11 @@ export class ExcelParser {
     'ملاحظات': 'notes',
   };
 
+  // Removes a leading UTF-8 BOM (common in CSV files saved from Excel/Windows) and trims whitespace.
+  private static cleanCell(value: any): string {
+    return String(value ?? '').replace(/^\uFEFF/, '').trim();
+  }
+
   public static async parseFile(file: File): Promise<Record<string, any>[]> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -69,7 +74,60 @@ export class ExcelParser {
           const workbook = XLSX.read(data, { type: 'array' });
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
-          const json = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '' });
+
+          // Read the sheet as a raw 2D array first (no header assumption yet). This lets us
+          // find the *real* header row even if the file starts with a title, a legend/notes
+          // row, merged cells, or blank rows above the actual table — instead of always
+          // blindly trusting row 1, which is what caused "Product name required" / "selling
+          // price required" on every row when the first row wasn't the header row.
+          const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, {
+            header: 1,
+            defval: '',
+            blankrows: false,
+          });
+
+          const knownHeaders = new Set([
+            ...Object.keys(this.productHeaderMap),
+            ...Object.keys(this.customerHeaderMap),
+          ]);
+
+          // Score each of the first few rows by how many cells match a known header name,
+          // and pick the row with the best score as the real header row.
+          let headerRowIdx = 0;
+          let bestScore = -1;
+          const scanLimit = Math.min(rows.length, 10);
+          for (let i = 0; i < scanLimit; i++) {
+            const row = rows[i] || [];
+            const score = row.reduce((acc: number, cell) => {
+              const clean = this.cleanCell(cell).toLowerCase();
+              return acc + (clean && knownHeaders.has(clean) ? 1 : 0);
+            }, 0);
+            if (score > bestScore) {
+              bestScore = score;
+              headerRowIdx = i;
+            }
+          }
+
+          // Nothing matched a known header at all: fall back to the first non-empty row
+          // (old behavior), rather than guessing further.
+          if (bestScore <= 0) {
+            const firstNonEmpty = rows.findIndex((r) => (r || []).some((cell) => this.cleanCell(cell) !== ''));
+            headerRowIdx = firstNonEmpty >= 0 ? firstNonEmpty : 0;
+          }
+
+          const headerRow = (rows[headerRowIdx] || []).map((h) => this.cleanCell(h));
+          const dataRows = rows.slice(headerRowIdx + 1);
+
+          const json: Record<string, any>[] = dataRows
+            .filter((r) => (r || []).some((cell) => this.cleanCell(cell) !== '')) // skip blank rows
+            .map((r) => {
+              const obj: Record<string, any> = {};
+              headerRow.forEach((h, colIdx) => {
+                if (h) obj[h] = r[colIdx] ?? '';
+              });
+              return obj;
+            });
+
           resolve(json);
         } catch (err) {
           reject(err);
