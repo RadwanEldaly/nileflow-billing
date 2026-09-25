@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Product, Supplier } from '../types';
-import { Search, Plus, Trees, Edit3, Trash2, X, FileSpreadsheet } from 'lucide-react';
+import { Search, Plus, Trees, Edit3, Trash2, X, FileSpreadsheet, CheckSquare, Square, Banknote } from 'lucide-react';
+import { BulkPriceUpdateModal } from '../components/BulkPriceUpdateModal';
 
 interface ProductsPageProps {
   products: Product[];
@@ -25,6 +26,10 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   const [selectedWoodType, setSelectedWoodType] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  
+  // Bulk price update state
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [isBulkPriceModalOpen, setIsBulkPriceModalOpen] = useState(false);
 
   // واجهة نظيفة تماماً كما طلبت
   const [formData, setFormData] = useState({
@@ -43,7 +48,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   });
 
   const woodTypes = Array.from(new Set(products.map((p) => p.wood_type).filter(Boolean)));
-
+  
   const filteredProducts = products.filter((p) => {
     const matchesSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -54,6 +59,31 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     const matchesWood = selectedWoodType === 'all' || p.wood_type === selectedWoodType;
     return matchesSearch && matchesWood;
   });
+
+  // Bulk selection handlers
+  const toggleSelectAll = () => {
+    if (selectedProductIds.size === filteredProducts.length) {
+      setSelectedProductIds(new Set());
+    } else {
+      setSelectedProductIds(new Set(filteredProducts.map((p) => p.id)));
+    }
+  };
+
+  const toggleSelectProduct = (productId: string) => {
+    const newSet = new Set(selectedProductIds);
+    if (newSet.has(productId)) {
+      newSet.delete(productId);
+    } else {
+      newSet.add(productId);
+    }
+    setSelectedProductIds(newSet);
+  };
+
+  const selectedProducts = products.filter((p) => selectedProductIds.has(p.id));
+  const selectedWoodTypeForBulk = selectedProducts.length > 0 
+    ? selectedProducts[0].wood_type 
+    : '';
+  const allSelectedSameWoodType = selectedProducts.every((p) => p.wood_type === selectedWoodTypeForBulk);
 
   const handleSubmitNew = (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,17 +108,14 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         stock_quantity: stockQty,
         min_stock_level: minStock,
       };
-
       if (formData.size) updates.size = formData.size;
       if (formData.color) updates.color = formData.color;
       if (formData.notes) updates.notes = formData.notes;
-
       onUpdateProduct(editingProduct.id, updates);
       setEditingProduct(null);
     } else {
       // توليد كود فريد لمنع خطأ التكرار في قاعدة البيانات
       const generatedCode = formData.code || `WOOD-${Math.floor(1000 + Math.random() * 9000)}`;
-
       // مابنتبعتش received_date لأن العمود مش موجود في الـ DB — created_at بيتسجل تلقائياً
       const newProd: Omit<Product, 'id' | 'created_at' | 'updated_at'> = {
         code: generatedCode,
@@ -101,11 +128,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         min_stock_level: minStock,
         is_active: true,
       };
-
       if (formData.size) newProd.size = formData.size;
       if (formData.color) newProd.color = formData.color;
       if (formData.notes) newProd.notes = formData.notes;
-
       onAddProduct(newProd);
     }
 
@@ -151,7 +176,19 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     );
     if (confirmed) {
       onDeleteProduct(prod.id);
+      // Remove from selection if deleted
+      setSelectedProductIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(prod.id);
+        return newSet;
+      });
     }
+  };
+
+  const handleBulkPriceUpdateSuccess = () => {
+    // Clear selection after successful update
+    setSelectedProductIds(new Set());
+    setIsBulkPriceModalOpen(false);
   };
 
   return (
@@ -168,7 +205,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
               : 'Manage MDF, Counter, Plywood, and hardwood sheet stock & prices.'}
           </p>
         </div>
-
         <div className="flex items-center gap-2">
           <button
             onClick={onNavigateToImport}
@@ -177,6 +213,18 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             <FileSpreadsheet className="w-4 h-4" />
             <span>{language === 'ar' ? 'استيراد إكسيل دفعة واحدة' : 'Import Excel'}</span>
           </button>
+          
+          {/* Bulk Price Update Button */}
+          {selectedProductIds.size > 0 && allSelectedSameWoodType && (
+            <button
+              onClick={() => setIsBulkPriceModalOpen(true)}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-sm transition"
+            >
+              <Banknote className="w-4 h-4" />
+              <span>{language === 'ar' ? `تحديث أسعار (${selectedProductIds.size})` : `Update Prices (${selectedProductIds.size})`}</span>
+            </button>
+          )}
+          
           <button
             onClick={() => {
               setEditingProduct(null);
@@ -205,6 +253,17 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         </div>
       </div>
 
+      {/* Bulk selection warning if mixed wood types */}
+      {selectedProductIds.size > 0 && !allSelectedSameWoodType && (
+        <div className="bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900 rounded-xl p-3 flex items-start gap-2">
+          <span className="text-xs text-orange-800 dark:text-orange-300 font-bold">
+            {language === 'ar'
+              ? '⚠️ لا يمكن تحديث الأسعار لأصناف من أنواع خشب مختلفة. يرجى اختيار أصناف من نفس النوع فقط.'
+              : '⚠️ Cannot update prices for products with different wood types. Please select products of the same type only.'}
+          </span>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="w-4 h-4 absolute top-3 right-3 text-slate-400 rtl:right-3 ltr:left-3" />
@@ -216,7 +275,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             className="w-full pl-4 pr-10 rtl:pr-10 rtl:pl-4 ltr:pl-10 ltr:pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
           />
         </div>
-
         {woodTypes.length > 0 && (
           <select
             value={selectedWoodType}
@@ -239,6 +297,19 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             <table className="w-full text-sm text-right rtl:text-right ltr:text-left">
               <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 text-xs uppercase border-b border-slate-200 dark:border-slate-700">
                 <tr>
+                  <th className="px-6 py-3.5">
+                    <button
+                      onClick={toggleSelectAll}
+                      className="flex items-center justify-center hover:text-amber-600 transition"
+                      title={language === 'ar' ? 'تحديد الكل' : 'Select All'}
+                    >
+                      {selectedProductIds.size === filteredProducts.length ? (
+                        <CheckSquare className="w-5 h-5" />
+                      ) : (
+                        <Square className="w-5 h-5" />
+                      )}
+                    </button>
+                  </th>
                   <th className="px-6 py-3.5">كود اللوح</th>
                   <th className="px-6 py-3.5">اسم المنتج / اللوح</th>
                   <th className="px-6 py-3.5">نوع الخشب</th>
@@ -253,8 +324,21 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                 {filteredProducts.map((p) => {
                   const isLowStock = p.stock_quantity <= (p.min_stock_level || 10);
+                  const isSelected = selectedProductIds.has(p.id);
                   return (
-                    <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                    <tr key={p.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 ${isSelected ? 'bg-amber-50 dark:bg-amber-950/20' : ''}`}>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => toggleSelectProduct(p.id)}
+                          className="flex items-center justify-center hover:text-amber-600 transition"
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-5 h-5 text-amber-600" />
+                          ) : (
+                            <Square className="w-5 h-5" />
+                          )}
+                        </button>
+                      </td>
                       <td className="px-6 py-4 font-mono font-bold text-xs text-slate-500">{p.code}</td>
                       <td className="px-6 py-4 font-extrabold text-slate-900 dark:text-white">{p.name}</td>
                       <td className="px-6 py-4">
@@ -335,7 +419,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                 <X className="w-5 h-5" />
               </button>
             </div>
-
             <form onSubmit={handleSubmitNew} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -350,7 +433,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                 />
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -364,7 +446,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-mono"
                   />
                 </div>
-
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     نوع الخشب *
@@ -379,7 +460,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   />
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -393,7 +473,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-mono font-bold"
                   />
                 </div>
-
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     اللون / الدرجة
@@ -407,7 +486,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   />
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -416,11 +494,10 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   <input
                     type="text"
                     disabled
-                    value="يُسجَّل تلقائياً عند الحفظ"
+                    value="يُسجَّل تلقائياً عند الحفظ"
                     className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-500 cursor-not-allowed"
                   />
                 </div>
-
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     سعر البيع (للّوح) *
@@ -435,7 +512,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   />
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -448,7 +524,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-bold"
                   />
                 </div>
-
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     حد إعادة الطلب (ألواح)
@@ -461,7 +536,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   />
                 </div>
               </div>
-
               <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
@@ -480,6 +554,18 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Bulk Price Update Modal */}
+      {isBulkPriceModalOpen && selectedProducts.length > 0 && allSelectedSameWoodType && (
+        <BulkPriceUpdateModal
+          woodType={selectedWoodTypeForBulk}
+          selectedProducts={selectedProducts}
+          performedBy="admin" // TODO: Replace with actual user profile
+          language={language}
+          onClose={() => setIsBulkPriceModalOpen(false)}
+          onUpdated={handleBulkPriceUpdateSuccess}
+        />
       )}
     </div>
   );
