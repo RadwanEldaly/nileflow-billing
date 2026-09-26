@@ -6,6 +6,7 @@ import {
   Product,
   Warehouse,
   SalesInvoice,
+  SalesInvoiceItem,
   PurchaseInvoice,
   StockMovement,
   FinancialTransaction,
@@ -255,6 +256,103 @@ export function App() {
       }
     } else {
       console.error('Error creating sales invoice:', invError);
+    }
+  };
+
+  const handleUpdateSalesInvoice = async (
+    invoiceId: string,
+    invoiceData: Omit<SalesInvoice, 'id' | 'created_at'>
+  ) => {
+    const oldInvoice = salesInvoices.find((i) => i.id === invoiceId);
+    if (!oldInvoice) return;
+
+    const { items: newItems, ...invoiceRecord } = invoiceData;
+
+    // 1) Reverse the OLD invoice's stock effect (same pattern as handleDeleteSalesInvoice)
+    if (oldInvoice.items) {
+      for (const item of oldInvoice.items) {
+        if (item.product_id) {
+          await handleAddStockMovement({
+            product_id: item.product_id,
+            product_name: item.product_name_snapshot,
+            warehouse_id: oldInvoice.warehouse_id,
+            movement_type: 'sales_return',
+            quantity: item.quantity_sheets,
+            reference_id: oldInvoice.invoice_number,
+            notes: `تعديل فاتورة بيع رقم ${oldInvoice.invoice_number} - إرجاع الكمية قبل التعديل`,
+          });
+        }
+      }
+    }
+
+    // 2) Reverse the OLD invoice's effect on the old customer's balance
+    const oldCust = customers.find((c) => c.id === oldInvoice.customer_id);
+    let oldCustBalanceAfterReversal = 0;
+    if (oldCust) {
+      oldCustBalanceAfterReversal = (oldCust.balance || 0) - oldInvoice.remaining_balance;
+      const { data } = await supabase.from('customers').update({ balance: oldCustBalanceAfterReversal }).eq('id', oldCust.id).select();
+      if (data && data[0]) {
+        oldCustBalanceAfterReversal = data[0].balance;
+        setCustomers((prev) => prev.map((c) => (c.id === oldCust.id ? data[0] : c)));
+      }
+    }
+
+    // 3) Update the invoice header row
+    const { data: updatedInvData, error: updateError } = await supabase
+      .from('sales_invoices')
+      .update(invoiceRecord)
+      .eq('id', invoiceId)
+      .select();
+
+    if (!updatedInvData || !updatedInvData[0]) {
+      console.error('Error updating sales invoice:', updateError);
+      alert(language === 'ar' ? 'فشل تحديث الفاتورة، برجاء المحاولة مرة أخرى' : 'Failed to update invoice, please try again');
+      return;
+    }
+
+    // 4) Replace the invoice's items with the edited set
+    await supabase.from('sales_invoice_items').delete().eq('invoice_id', invoiceId);
+    let insertedItems: SalesInvoiceItem[] = [];
+    if (newItems && newItems.length > 0) {
+      const itemsToInsert = newItems.map((item) => ({ ...item, invoice_id: invoiceId }));
+      const { data: insertedData } = await supabase.from('sales_invoice_items').insert(itemsToInsert).select();
+      if (insertedData) insertedItems = insertedData;
+    }
+
+    const finalInvoice: SalesInvoice = { ...updatedInvData[0], items: insertedItems };
+    setSalesInvoices((prev) => prev.map((i) => (i.id === invoiceId ? finalInvoice : i)));
+
+    // 5) Apply the NEW invoice's stock effect (same pattern as handleCreateSalesInvoice)
+    if (insertedItems.length > 0) {
+      for (const item of insertedItems) {
+        if (item.product_id) {
+          await handleAddStockMovement({
+            product_id: item.product_id,
+            product_name: item.product_name_snapshot,
+            warehouse_id: finalInvoice.warehouse_id,
+            movement_type: 'sale',
+            quantity: -item.quantity_sheets,
+            reference_id: finalInvoice.invoice_number,
+            notes: `تعديل فاتورة بيع رقم ${finalInvoice.invoice_number} - تطبيق الكمية بعد التعديل`,
+          });
+        }
+      }
+    }
+
+    // 6) Apply the NEW invoice's effect on the (possibly different) customer's balance.
+    // If it's the same customer as before, start from the already-reversed balance
+    // from step 2 instead of the stale pre-reversal value in local state.
+    const sameCustomer = !!oldCust && oldCust.id === finalInvoice.customer_id;
+    const baseBalance = sameCustomer
+      ? oldCustBalanceAfterReversal
+      : customers.find((c) => c.id === finalInvoice.customer_id)?.balance || 0;
+
+    if (finalInvoice.customer_id) {
+      const newBalance = baseBalance + finalInvoice.remaining_balance;
+      const { data: newCustData } = await supabase.from('customers').update({ balance: newBalance }).eq('id', finalInvoice.customer_id).select();
+      if (newCustData && newCustData[0]) {
+        setCustomers((prev) => prev.map((c) => (c.id === finalInvoice.customer_id ? newCustData[0] : c)));
+      }
     }
   };
 
@@ -527,6 +625,7 @@ export function App() {
             warehouses={warehouses}
             language={language}
             onCreateInvoice={handleCreateSalesInvoice}
+            onUpdateInvoice={handleUpdateSalesInvoice}
             onDeleteInvoice={handleDeleteSalesInvoice}
             isCreateOpenInitially={isSalesModalOpenInitially}
           />

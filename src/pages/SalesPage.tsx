@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Customer, Product, Warehouse, SalesInvoice, SalesInvoiceItem } from '../types';
-import { Search, Plus, Receipt, Printer, Trash2, X, FileText, CheckCircle2 } from 'lucide-react';
+import { Search, Plus, Receipt, Printer, Trash2, X, FileText, CheckCircle2, Edit3 } from 'lucide-react';
 import { amountToArabicWords } from '../lib/numberToArabicWords';
 
 interface SalesPageProps {
@@ -10,6 +10,7 @@ interface SalesPageProps {
   warehouses: Warehouse[];
   language: 'ar' | 'en';
   onCreateInvoice: (invoice: Omit<SalesInvoice, 'id' | 'created_at'>) => void;
+  onUpdateInvoice: (invoiceId: string, invoice: Omit<SalesInvoice, 'id' | 'created_at'>) => void;
   onDeleteInvoice: (invoiceId: string) => void;
   isCreateOpenInitially?: boolean;
 }
@@ -21,6 +22,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({
   warehouses,
   language,
   onCreateInvoice,
+  onUpdateInvoice,
   onDeleteInvoice,
   isCreateOpenInitially = false,
 }) => {
@@ -28,7 +30,8 @@ export const SalesPage: React.FC<SalesPageProps> = ({
   const [selectedCustomerId, setSelectedCustomerId] = useState('all');
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<SalesInvoice | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(isCreateOpenInitially);
-
+  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
+  
   // Invoice Form State
   const [customerId, setCustomerId] = useState('');
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id || '');
@@ -36,10 +39,13 @@ export const SalesPage: React.FC<SalesPageProps> = ({
   const [discountInput, setDiscountInput] = useState('0');
   const [paidAmountInput, setPaidAmountInput] = useState('');
   const [notes, setNotes] = useState('');
-
   const [lineItems, setLineItems] = useState<
     { productId: string; quantity: number; unitPrice: number; lineTotal: number }[]
   >([]);
+  
+  // Product search/autocomplete state for the line-items builder
+  const [openProductDropdownIndex, setOpenProductDropdownIndex] = useState<number | null>(null);
+  const [productQuery, setProductQuery] = useState('');
 
   const handleAddLineItem = () => {
     if (products.length === 0) return;
@@ -113,8 +119,13 @@ export const SalesPage: React.FC<SalesPageProps> = ({
       }
     }
 
-    const nextSeq = salesInvoices.length + 1;
-    const formattedNum = `INV-WOOD-${String(nextSeq).padStart(5, '0')}`;
+    const nextSeq = editingInvoiceId 
+      ? salesInvoices.find(inv => inv.id === editingInvoiceId)?.invoice_number.split('-')[2] || String(salesInvoices.length + 1).padStart(5, '0')
+      : String(salesInvoices.length + 1).padStart(5, '0');
+    
+    const formattedNum = editingInvoiceId 
+      ? salesInvoices.find(inv => inv.id === editingInvoiceId)?.invoice_number || `INV-WOOD-${nextSeq}`
+      : `INV-WOOD-${nextSeq}`;
 
     const itemsPrepared: SalesInvoiceItem[] = lineItems.map((item) => {
       const prod = products.find((p) => p.id === item.productId);
@@ -130,28 +141,90 @@ export const SalesPage: React.FC<SalesPageProps> = ({
       };
     });
 
-    onCreateInvoice({
-      invoice_number: formattedNum,
-      customer_id: customerId,
-      warehouse_id: warehouseId,
-      invoice_date: invoiceDate,
-      status: 'approved',
-      subtotal,
-      discount: discountVal,
-      total: grandTotal,
-      paid_amount: paidVal,
-      remaining_balance: remainingVal,
-      notes,
-      items: itemsPrepared,
-    });
+    if (editingInvoiceId) {
+      onUpdateInvoice(editingInvoiceId, {
+        invoice_number: formattedNum,
+        customer_id: customerId,
+        warehouse_id: warehouseId,
+        invoice_date: invoiceDate,
+        status: 'approved',
+        subtotal,
+        discount: discountVal,
+        total: grandTotal,
+        paid_amount: paidVal,
+        remaining_balance: remainingVal,
+        notes,
+        items: itemsPrepared,
+      });
+    } else {
+      onCreateInvoice({
+        invoice_number: formattedNum,
+        customer_id: customerId,
+        warehouse_id: warehouseId,
+        invoice_date: invoiceDate,
+        status: 'approved',
+        subtotal,
+        discount: discountVal,
+        total: grandTotal,
+        paid_amount: paidVal,
+        remaining_balance: remainingVal,
+        notes,
+        items: itemsPrepared,
+      });
+    }
 
     setIsCreateModalOpen(false);
+    setEditingInvoiceId(null);
     setCustomerId('');
     setLineItems([]);
     setPaidAmountInput('');
     setDiscountInput('0');
     setNotes('');
   };
+
+  // New: Handle edit click
+  const handleEditClick = (invoice: SalesInvoice) => {
+    setEditingInvoiceId(invoice.id);
+    setCustomerId(invoice.customer_id);
+    setWarehouseId(invoice.warehouse_id);
+    setInvoiceDate(invoice.invoice_date);
+    setDiscountInput(String(invoice.discount));
+    setPaidAmountInput(String(invoice.paid_amount));
+    setNotes(invoice.notes || '');
+    
+    // Convert existing items to line items format
+    if (invoice.items) {
+      const existingLineItems = invoice.items.map(item => ({
+        productId: item.product_id || '',
+        quantity: item.quantity_sheets,
+        unitPrice: item.unit_price,
+        lineTotal: item.line_total,
+      }));
+      setLineItems(existingLineItems);
+    }
+    
+    setIsCreateModalOpen(true);
+  };
+
+  // New: Reset form when closing modal
+  const handleCloseModal = () => {
+    setIsCreateModalOpen(false);
+    setEditingInvoiceId(null);
+    setCustomerId('');
+    setLineItems([]);
+    setPaidAmountInput('');
+    setDiscountInput('0');
+    setNotes('');
+  };
+
+  // New: Filter products for autocomplete
+  const filteredProducts = productQuery.trim() === '' 
+    ? [] 
+    : products.filter(p => 
+        p.name.toLowerCase().includes(productQuery.toLowerCase()) ||
+        p.code.toLowerCase().includes(productQuery.toLowerCase()) ||
+        p.wood_type.toLowerCase().includes(productQuery.toLowerCase())
+      ).slice(0, 10); // Limit to 10 results
 
   const filteredInvoices = salesInvoices.filter((inv) => {
     const cust = customers.find((c) => c.id === inv.customer_id);
@@ -176,7 +249,6 @@ export const SalesPage: React.FC<SalesPageProps> = ({
               : 'Issue wood sheet sales invoices with automatic inventory deduction.'}
           </p>
         </div>
-
         <button
           onClick={() => {
             setIsCreateModalOpen(true);
@@ -203,7 +275,6 @@ export const SalesPage: React.FC<SalesPageProps> = ({
             className="w-full pl-4 pr-10 rtl:pr-10 rtl:pl-4 ltr:pl-10 ltr:pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
           />
         </div>
-
         {customers.length > 0 && (
           <select
             value={selectedCustomerId}
@@ -266,18 +337,27 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                         </button>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => {
-                            const confirmed = window.confirm(
-                              `متأكد إنك عايز تحذف فاتورة "${inv.invoice_number}" نهائيًا؟ هيترجع رصيد الألواح المباعة فيها للمخزون، ويترجع رصيد العميل زي ما كان قبلها. الحذف ده مش هينفع ترجع فيه.`
-                            );
-                            if (confirmed) onDeleteInvoice(inv.id);
-                          }}
-                          title="حذف الفاتورة"
-                          className="p-1.5 bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 hover:bg-red-100 rounded-lg transition"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => handleEditClick(inv)}
+                            title="تعديل الفاتورة"
+                            className="p-1.5 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-100 rounded-lg transition"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              const confirmed = window.confirm(
+                                `متأكد إنك عايز تحذف فاتورة "${inv.invoice_number}" نهائيًا؟ هيترجع رصيد الألواح المباعة فيها للمخزون، ويترجع رصيد العميل زي ما كان قبلها. الحذف ده مش هينفع ترجع فيه.`
+                              );
+                              if (confirmed) onDeleteInvoice(inv.id);
+                            }}
+                            title="حذف الفاتورة"
+                            className="p-1.5 bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 hover:bg-red-100 rounded-lg transition"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -295,7 +375,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({
         )}
       </div>
 
-      {/* Modal Create Sales Invoice */}
+      {/* Modal Create/Edit Sales Invoice */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-5 border border-slate-200 dark:border-slate-700 max-h-[92vh] overflow-y-auto">
@@ -303,14 +383,13 @@ export const SalesPage: React.FC<SalesPageProps> = ({
               <div className="flex items-center gap-2">
                 <Receipt className="w-5 h-5 text-amber-600" />
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                  إصدار فاتورة بيع أخشاب جديدة - شركة الدالي
+                  {editingInvoiceId ? 'تعديل فاتورة بيع أخشاب' : 'إصدار فاتورة بيع أخشاب جديدة - شركة الدالي'}
                 </h3>
               </div>
-              <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
-
             <form onSubmit={handleSaveInvoice} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-700">
                 <div>
@@ -331,7 +410,6 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                     ))}
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                     المخزن المصدر *
@@ -349,7 +427,6 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                     ))}
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                     تاريخ الفاتورة
@@ -364,7 +441,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                 </div>
               </div>
 
-              {/* Line Items Builder */}
+              {/* Line Items Builder with Autocomplete */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -379,26 +456,68 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                     <span>+ إضافة صنف لوح</span>
                   </button>
                 </div>
-
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                   {lineItems.map((item, idx) => {
                     const selectedProd = products.find((p) => p.id === item.productId);
+                    const isOpen = openProductDropdownIndex === idx;
+                    
                     return (
-                      <div key={idx} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                        <div className="flex-1">
-                          <select
-                            value={item.productId}
-                            onChange={(e) => handleProductChange(idx, e.target.value)}
+                      <div key={idx} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 relative">
+                        <div className="flex-1 relative">
+                          {/* Autocomplete Input */}
+                          <input
+                            type="text"
+                            value={isOpen ? productQuery : (selectedProd ? `${selectedProd.name} (${selectedProd.wood_type})` : '')}
+                            onChange={(e) => {
+                              setProductQuery(e.target.value);
+                              setOpenProductDropdownIndex(idx);
+                            }}
+                            onFocus={() => {
+                              setOpenProductDropdownIndex(idx);
+                              setProductQuery(selectedProd ? selectedProd.name : '');
+                            }}
+                            onBlur={() => {
+                              // Delay closing to allow click on dropdown
+                              setTimeout(() => setOpenProductDropdownIndex(null), 200);
+                            }}
+                            placeholder="ابحث باسم الصنف أو الكود..."
                             className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold"
-                          >
-                            {products.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name} ({p.wood_type}) - المتوفر: {p.stock_quantity} لوح - سعر: {p.selling_price} EGP
-                              </option>
-                            ))}
-                          </select>
+                          />
+                          
+                          {/* Dropdown Results */}
+                          {isOpen && filteredProducts.length > 0 && (
+                            <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                              {filteredProducts.map((prod) => (
+                                <button
+                                  key={prod.id}
+                                  type="button"
+                                  onMouseDown={() => {
+                                    handleProductChange(idx, prod.id);
+                                    setOpenProductDropdownIndex(null);
+                                    setProductQuery('');
+                                  }}
+                                  className="w-full text-right px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold border-b border-slate-100 dark:border-slate-700 last:border-0"
+                                >
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-slate-900 dark:text-white">{prod.name}</span>
+                                    <span className="text-slate-500 text-[10px]">{prod.code}</span>
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 mt-0.5">
+                                    {prod.wood_type} | متوفر: {prod.stock_quantity} لوح | سعر: {prod.selling_price} EGP
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Show selected product info when not searching */}
+                          {!isOpen && selectedProd && (
+                            <div className="absolute top-full left-0 mt-1 text-[10px] text-slate-500 bg-white dark:bg-slate-800 px-2 py-1 rounded border border-slate-200 dark:border-slate-700">
+                              كود: {selectedProd.code} | متوفر: {selectedProd.stock_quantity} لوح
+                            </div>
+                          )}
                         </div>
-
+                        
                         <div className="w-24">
                           <label className="text-[10px] text-slate-400 block text-center">عدد الألواح</label>
                           <input
@@ -409,7 +528,6 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                             className="w-full px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-center font-bold"
                           />
                         </div>
-
                         <div className="w-24">
                           <label className="text-[10px] text-slate-400 block text-center">سعر اللوح</label>
                           <input
@@ -420,11 +538,9 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                             className="w-full px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-center font-bold"
                           />
                         </div>
-
                         <div className="w-24 text-left font-mono font-bold text-xs text-amber-600">
                           {item.lineTotal.toLocaleString()} EGP
                         </div>
-
                         <button
                           type="button"
                           onClick={() => handleRemoveLineItem(idx)}
@@ -444,7 +560,6 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                   <span>المجموع الفرعي:</span>
                   <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{subtotal.toLocaleString()} EGP</span>
                 </div>
-
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500">الخصم المباشر (جنيه):</span>
                   <input
@@ -455,12 +570,10 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                     className="w-28 px-2 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-xs text-right font-bold"
                   />
                 </div>
-
                 <div className="flex justify-between text-base font-black text-slate-900 dark:text-white pt-2 border-t border-slate-200 dark:border-slate-700">
                   <span>إجمالي الفاتورة النهائي:</span>
                   <span className="font-mono text-amber-600 dark:text-amber-400">{grandTotal.toLocaleString()} EGP</span>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -475,7 +588,6 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                       className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold text-emerald-600"
                     />
                   </div>
-
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                       المتبقي كدين على العميل
@@ -490,7 +602,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({
               <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
+                  onClick={handleCloseModal}
                   className="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-700"
                 >
                   إلغاء
@@ -499,7 +611,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                   type="submit"
                   className="px-5 py-2 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white shadow-md"
                 >
-                  اعتماد خصم المخزن وإصدار الفاتورة
+                  {editingInvoiceId ? 'حفظ التعديلات' : 'اعتماد خصم المخزن وإصدار الفاتورة'}
                 </button>
               </div>
             </form>
@@ -507,7 +619,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({
         </div>
       )}
 
-      {/* Printable Invoice Receipt Modal — laid out to mirror the paper "بيان بيع" form */}
+      {/* Printable Invoice Receipt Modal — Fixed to match print layout */}
       {selectedInvoiceForView && (() => {
         const cust = customers.find((c) => c.id === selectedInvoiceForView.customer_id);
         const items = selectedInvoiceForView.items || [];
@@ -515,11 +627,11 @@ export const SalesPage: React.FC<SalesPageProps> = ({
           <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 print:static print:bg-transparent print:p-0">
             <div
               id="sales-invoice-print-area"
-              className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-700 print:m-0 print:p-0 print:max-w-none print:w-full print:shadow-none print:border-0 print:rounded-none"
+              className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 border border-slate-200 print:m-0 print:p-0 print:max-w-none print:w-full print:shadow-none print:border-0 print:rounded-none"
               dir="rtl"
             >
-              <div className="flex items-center justify-between border-b pb-4 border-slate-200 dark:border-slate-700 print:hidden">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+              <div className="flex items-center justify-between border-b pb-4 border-slate-200 print:hidden">
+                <h3 className="text-lg font-bold text-slate-900">
                   فاتورة مبيعات أخشاب #{selectedInvoiceForView.invoice_number}
                 </h3>
                 <div className="flex items-center gap-2">
@@ -549,7 +661,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                   <h1 className="text-lg font-black tracking-wide">فاتورة بيع</h1>
                 </div>
 
-                {/* Top info boxes: رقم البيان / تاريخ البيان on the right, customer info on the left — like the paper form */}
+                {/* Top info boxes */}
                 <div className="flex flex-wrap justify-between gap-3 mb-3">
                   <div className="border border-slate-400 rounded-md overflow-hidden text-xs w-44">
                     <div className="flex justify-between px-2 py-1 border-b border-slate-400 bg-slate-50">
@@ -561,7 +673,6 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                       <span className="font-mono">{selectedInvoiceForView.invoice_date}</span>
                     </div>
                   </div>
-
                   <div className="text-xs space-y-1 text-left">
                     <div><span className="font-bold">اسم العميل:</span> {cust?.name || 'عميل'}</div>
                     <div><span className="font-bold">كود العميل:</span> {cust?.code || '-'}</div>
@@ -575,7 +686,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                   <span>الحالة: {selectedInvoiceForView.status === 'approved' ? 'معتمدة ✅' : selectedInvoiceForView.status === 'draft' ? 'مسودة' : 'ملغاة'}</span>
                 </div>
 
-                {/* Items table — same column order as the paper form */}
+                {/* Items table */}
                 <table className="w-full text-xs border-collapse border border-slate-400">
                   <thead>
                     <tr className="bg-slate-100">
@@ -611,7 +722,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                   </tbody>
                 </table>
 
-                {/* Totals box — right-aligned like the paper form's اجمالي البيان / الخصم / الصافي box */}
+                {/* Totals box */}
                 <div className="flex justify-start mt-3">
                   <table className="text-xs border-collapse border border-slate-400 w-56">
                     <tbody>
@@ -631,7 +742,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                   </table>
                 </div>
 
-                {/* Amount in words — "فقط وقدره ... لا غير" */}
+                {/* Amount in words */}
                 <div className="text-[11px] mt-3 pt-2 border-t border-slate-300">
                   <span className="font-bold">فقط وقدره:</span> {amountToArabicWords(selectedInvoiceForView.total)}
                 </div>
@@ -646,7 +757,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                   <div className="text-[11px] text-slate-500 mt-2">ملاحظات: {selectedInvoiceForView.notes}</div>
                 )}
 
-                {/* Signatures — matches the paper's المحاسب / أمين المخزن footer */}
+                {/* Signatures */}
                 <div className="flex justify-between mt-10 pt-4 text-xs">
                   <div className="text-center w-40">
                     <div className="font-bold mb-8">أمين المخزن</div>
@@ -660,7 +771,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({
               </div>
             </div>
 
-            {/* A4 print rules — applied only when printing, so the on-screen modal is unaffected */}
+            {/* A4 print rules */}
             <style>{`
               @media print {
                 @page { size: A4; margin: 12mm; }
