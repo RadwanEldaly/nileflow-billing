@@ -500,6 +500,7 @@ export function App() {
           <ProductsPage
             products={products}
             suppliers={suppliers}
+            movements={stockMovements}
             language={language}
             onAddProduct={handleAddProduct}
             onUpdateProduct={handleUpdateProduct}

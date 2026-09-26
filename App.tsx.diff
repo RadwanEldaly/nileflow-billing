@@ -1,0 +1,10 @@
+--- /tmp/diffcheck/App.orig.tsx	2026-09-26 13:27:48.620903213 +0000
++++ /tmp/diffcheck/App.new.tsx	2026-09-26 13:27:48.623758281 +0000
+@@ -500,6 +500,7 @@
+           <ProductsPage
+             products={products}
+             suppliers={suppliers}
++            movements={stockMovements}
+             language={language}
+             onAddProduct={handleAddProduct}
+             onUpdateProduct={handleUpdateProduct}
