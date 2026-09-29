@@ -31,6 +31,7 @@ interface ProductsPageProps {
   onUpdateProduct: (id: string, updates: Partial<Product>) => void;
   onDeleteProduct: (id: string) => void;
   onNavigateToImport: () => void;
+  onRefreshProducts?: () => void;
 }
 
 // Reused everywhere in the app as the "low stock" line (see the existing
@@ -59,6 +60,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   onUpdateProduct,
   onDeleteProduct,
   onNavigateToImport,
+  onRefreshProducts,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWoodType, setSelectedWoodType] = useState('all');
@@ -272,6 +274,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     // Clear selection after successful update
     setSelectedProductIds(new Set());
     setIsBulkPriceModalOpen(false);
+    onRefreshProducts?.();
   };
 
   // Row menu actions

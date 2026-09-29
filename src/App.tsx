@@ -705,6 +705,10 @@ export function App() {
               onUpdateProduct={handleUpdateProduct}
               onDeleteProduct={handleDeleteProduct}
               onNavigateToImport={() => setActiveTab('import')}
+              onRefreshProducts={async () => {
+                const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+                if (data) setProducts(data);
+              }}
             />
           )}
 

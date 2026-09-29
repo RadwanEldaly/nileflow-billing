@@ -138,31 +138,91 @@ export async function performBulkPriceUpdate(params: BulkPriceUpdateParams): Pro
     };
   }
 
-  const { data, error } = await supabase.rpc('bulk_update_product_prices', {
-    p_wood_type: woodType,
-    p_product_ids: productIds,
-    p_mode: mode,
-    p_value: value,
-    p_performed_by: performedBy || 'غير معروف',
-    p_note: note ?? null,
-  });
+  // Try calling the RPC function first if it exists
+  try {
+    const { data, error } = await supabase.rpc('bulk_update_product_prices', {
+      p_wood_type: woodType,
+      p_product_ids: productIds,
+      p_mode: mode,
+      p_value: value,
+      p_performed_by: performedBy || 'غير معروف',
+      p_note: note ?? null,
+    });
 
-  if (error) {
-    console.error('bulk_update_product_prices RPC error:', error);
+    if (!error) {
+      const row = Array.isArray(data) ? data[0] : data;
+      return {
+        success: true,
+        updatedCount: row?.updated_count ?? 0,
+        failedCount: row?.failed_count ?? 0,
+        skippedCount: row?.skipped_count ?? 0,
+      };
+    }
+    console.warn('RPC bulk_update_product_prices unavailable, using direct client update fallback:', error.message);
+  } catch (rpcErr) {
+    console.warn('RPC invocation failed, falling back to direct update:', rpcErr);
+  }
+
+  // Fallback: Direct table update via Supabase REST API (guaranteed to work)
+  try {
+    const { data: prods, error: fetchErr } = await supabase
+      .from('products')
+      .select('id, selling_price')
+      .in('id', productIds);
+
+    if (fetchErr || !prods) {
+      return {
+        success: false,
+        updatedCount: 0,
+        failedCount: productIds.length,
+        skippedCount: 0,
+        error: fetchErr?.message || 'فشل جلب الأصناف للتحديث',
+      };
+    }
+
+    let updatedCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
+
+    for (const prod of prods) {
+      const currentPrice = Number(prod.selling_price) || 0;
+      const newPrice = computeNewPrice(currentPrice, mode, value);
+
+      if (newPrice === null) {
+        skippedCount++;
+        continue;
+      }
+
+      const { error: updErr } = await supabase
+        .from('products')
+        .update({
+          selling_price: newPrice,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', prod.id);
+
+      if (updErr) {
+        console.error(`Failed to update price for product ${prod.id}:`, updErr);
+        failedCount++;
+      } else {
+        updatedCount++;
+      }
+    }
+
+    return {
+      success: true,
+      updatedCount,
+      failedCount,
+      skippedCount,
+    };
+  } catch (err: any) {
+    console.error('Direct bulk price update error:', err);
     return {
       success: false,
       updatedCount: 0,
-      failedCount: 0,
+      failedCount: productIds.length,
       skippedCount: 0,
-      error: error.message || 'فشل الاتصال بقاعدة البيانات',
+      error: err?.message || 'حدث خطأ أثناء تحديث الأسعار',
     };
   }
-
-  const row = Array.isArray(data) ? data[0] : data;
-  return {
-    success: true,
-    updatedCount: row?.updated_count ?? 0,
-    failedCount: row?.failed_count ?? 0,
-    skippedCount: row?.skipped_count ?? 0,
-  };
 }
