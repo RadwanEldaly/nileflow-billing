@@ -19,11 +19,13 @@ import { ProductsPage } from './pages/ProductsPage';
 import { WarehousesPage } from './pages/WarehousesPage';
 import { SalesPage } from './pages/SalesPage';
 import { PurchasesPage } from './pages/PurchasesPage';
+import { ReturnsPage } from './pages/ReturnsPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { SuppliersPage } from './pages/SuppliersPage';
 import { PaymentsPage } from './pages/PaymentsPage';
 import { ImportPage } from './pages/ImportPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { BackupModal } from './components/BackupModal';
 
 export function App() {
   const [language, setLanguage] = useState<'ar' | 'en'>('ar');
@@ -72,6 +74,7 @@ export function App() {
   // Navigation modals triggers
   const [isSalesModalOpenInitially, setIsSalesModalOpenInitially] = useState(false);
   const [isPurchaseModalOpenInitially, setIsPurchaseModalOpenInitially] = useState(false);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
 
   // Sync RTL / LTR document direction
   useEffect(() => {
@@ -552,6 +555,205 @@ export function App() {
     }
   };
 
+  const handleCreateSalesReturn = async (returnData: {
+    customerId: string;
+    warehouseId: string;
+    originalInvoiceNumber?: string;
+    items: {
+      productId?: string;
+      productName: string;
+      woodType?: string;
+      quantitySheets: number;
+      unitPrice: number;
+      lineTotal: number;
+    }[];
+    total: number;
+    refundMethod: 'credit' | 'cash';
+    notes?: string;
+  }) => {
+    try {
+      const year = new Date().getFullYear();
+      const count = salesInvoices.filter((i) => i.invoice_number.startsWith('RET-SALES-')).length + 1;
+      const invoiceNumber = `RET-SALES-${year}-${String(count).padStart(4, '0')}`;
+
+      const invoiceRecord = {
+        invoice_number: invoiceNumber,
+        customer_id: returnData.customerId,
+        warehouse_id: returnData.warehouseId || warehouses[0]?.id,
+        invoice_date: new Date().toISOString().slice(0, 10),
+        status: 'approved',
+        subtotal: returnData.total,
+        discount: 0,
+        total: returnData.total,
+        paid_amount: returnData.refundMethod === 'cash' ? returnData.total : 0,
+        remaining_balance: returnData.refundMethod === 'credit' ? returnData.total : 0,
+        notes: `مرتجع مبيعات ${returnData.originalInvoiceNumber ? 'للفاتورة ' + returnData.originalInvoiceNumber : ''} ${returnData.notes ? '- ' + returnData.notes : ''}`.trim(),
+      };
+
+      const { data: invData, error: invError } = await supabase.from('sales_invoices').insert([invoiceRecord]).select();
+      if (!invData || !invData[0]) {
+        console.error('Error creating sales return:', invError);
+        alert(language === 'ar' ? 'فشل تسجيل مرتجع المبيعات: ' + (invError?.message || '') : 'Failed to create sales return');
+        return;
+      }
+
+      const returnInvoiceId = invData[0].id;
+      let insertedItems: SalesInvoiceItem[] = [];
+
+      if (returnData.items.length > 0) {
+        const itemsToInsert = returnData.items.map((it) => ({
+          invoice_id: returnInvoiceId,
+          product_id: it.productId || null,
+          product_name_snapshot: it.productName,
+          wood_type_snapshot: it.woodType || 'MDF',
+          quantity_sheets: it.quantitySheets,
+          unit_price: it.unitPrice,
+          line_total: it.lineTotal,
+        }));
+
+        const { data: itemsData } = await supabase.from('sales_invoice_items').insert(itemsToInsert).select();
+        if (itemsData) insertedItems = itemsData;
+      }
+
+      setSalesInvoices([{ ...invData[0], items: insertedItems }, ...salesInvoices]);
+
+      // Stock movements: restock returned sheets with positive quantity
+      for (const it of returnData.items) {
+        if (it.productId) {
+          await handleAddStockMovement({
+            product_id: it.productId,
+            product_name: it.productName,
+            warehouse_id: invoiceRecord.warehouse_id,
+            movement_type: 'sales_return',
+            quantity: it.quantitySheets,
+            reference_id: invoiceNumber,
+            notes: `مرتجع مبيعات ${invoiceNumber}`,
+          });
+        }
+      }
+
+      // Financial balance adjustments:
+      if (returnData.refundMethod === 'credit') {
+        const cust = customers.find((c) => c.id === returnData.customerId);
+        if (cust) {
+          const updatedBalance = (cust.balance || 0) - returnData.total;
+          const { data: updatedCust } = await supabase.from('customers').update({ balance: updatedBalance }).eq('id', cust.id).select();
+          if (updatedCust && updatedCust[0]) {
+            setCustomers(customers.map((c) => (c.id === cust.id ? updatedCust[0] : c)));
+          }
+        }
+      } else {
+        await handleAddTransaction({
+          transaction_type: 'customer_payment',
+          party_type: 'customer',
+          party_id: returnData.customerId,
+          amount: -returnData.total,
+          payment_method: 'cash',
+          reference_invoice_id: returnInvoiceId,
+          transaction_date: invoiceRecord.invoice_date,
+          notes: `رد نقدي لمرتجع مبيعات رقم ${invoiceNumber}`,
+        });
+      }
+
+      alert(language === 'ar' ? `تم تسجيل مرتجع المبيعات رقم ${invoiceNumber} وإعادة الألواح للمخزن بنجاح!` : `Sales return ${invoiceNumber} created successfully!`);
+    } catch (err: any) {
+      console.error('Error handling sales return:', err);
+      alert('حدث خطأ أثناء حفظ المرتجع: ' + err.message);
+    }
+  };
+
+  const handleCreatePurchaseReturn = async (returnData: {
+    supplierId: string;
+    warehouseId: string;
+    originalInvoiceNumber?: string;
+    items: {
+      productId?: string;
+      productName: string;
+      woodType?: string;
+      quantitySheets: number;
+      unitPrice: number;
+      lineTotal: number;
+    }[];
+    total: number;
+    refundMethod: 'credit' | 'cash';
+    notes?: string;
+  }) => {
+    try {
+      const year = new Date().getFullYear();
+      const count = purchaseInvoices.filter((i) => i.invoice_number.startsWith('RET-PURCH-')).length + 1;
+      const invoiceNumber = `RET-PURCH-${year}-${String(count).padStart(4, '0')}`;
+
+      const invoiceRecord = {
+        invoice_number: invoiceNumber,
+        supplier_id: returnData.supplierId,
+        warehouse_id: returnData.warehouseId || warehouses[0]?.id,
+        invoice_date: new Date().toISOString().slice(0, 10),
+        status: 'approved',
+        total: returnData.total,
+        paid_amount: returnData.refundMethod === 'cash' ? returnData.total : 0,
+        remaining_balance: returnData.refundMethod === 'credit' ? returnData.total : 0,
+        notes: `مرتجع مشتريات ${returnData.originalInvoiceNumber ? 'للفاتورة ' + returnData.originalInvoiceNumber : ''} ${returnData.notes ? '- ' + returnData.notes : ''}`.trim(),
+      };
+
+      const { data: invData, error: invError } = await supabase.from('purchase_invoices').insert([invoiceRecord]).select();
+      if (!invData || !invData[0]) {
+        console.error('Error creating purchase return:', invError);
+        alert(language === 'ar' ? 'فشل تسجيل مرتجع المشتريات: ' + (invError?.message || '') : 'Failed to create purchase return');
+        return;
+      }
+
+      const returnInvoiceId = invData[0].id;
+      let insertedItems: any[] = [];
+
+      if (returnData.items.length > 0) {
+        const itemsToInsert = returnData.items.map((it) => ({
+          invoice_id: returnInvoiceId,
+          product_id: it.productId || null,
+          product_name_snapshot: it.productName,
+          wood_type_snapshot: it.woodType || 'MDF',
+          quantity_sheets: it.quantitySheets,
+          unit_price: it.unitPrice,
+          line_total: it.lineTotal,
+        }));
+
+        const { data: itemsData } = await supabase.from('purchase_invoice_items').insert(itemsToInsert).select();
+        if (itemsData) insertedItems = itemsData;
+      }
+
+      setPurchaseInvoices([{ ...invData[0], items: insertedItems }, ...purchaseInvoices]);
+
+      // Stock movements: remove returned sheets with negative quantity
+      for (const it of returnData.items) {
+        if (it.productId) {
+          await handleAddStockMovement({
+            product_id: it.productId,
+            product_name: it.productName,
+            warehouse_id: invoiceRecord.warehouse_id,
+            movement_type: 'purchase_return',
+            quantity: -it.quantitySheets,
+            reference_id: invoiceNumber,
+            notes: `مرتجع مشتريات ${invoiceNumber}`,
+          });
+        }
+      }
+
+      // Financial balance adjustments: reduce supplier debt
+      const sup = suppliers.find((s) => s.id === returnData.supplierId);
+      if (sup) {
+        const updatedBalance = (sup.balance || 0) - returnData.total;
+        const { data: updatedSup } = await supabase.from('suppliers').update({ balance: updatedBalance }).eq('id', sup.id).select();
+        if (updatedSup && updatedSup[0]) {
+          setSuppliers(suppliers.map((s) => (s.id === sup.id ? updatedSup[0] : s)));
+        }
+      }
+
+      alert(language === 'ar' ? `تم تسجيل مرتجع المشتريات رقم ${invoiceNumber} وخصم الألواح من المخزن بنجاح!` : `Purchase return ${invoiceNumber} created successfully!`);
+    } catch (err: any) {
+      console.error('Error handling purchase return:', err);
+      alert('حدث خطأ أثناء حفظ المرتجع: ' + err.message);
+    }
+  };
+
   const handleAddTransaction = async (txData: Omit<FinancialTransaction, 'id' | 'created_at'>) => {
     const { data, error } = await supabase.from('financial_transactions').insert([txData]).select();
     if (data && data[0]) {
@@ -629,6 +831,7 @@ export function App() {
     warehouses: { ar: 'المخازن وحركة الألواح', en: 'Warehouses & Stock' },
     sales: { ar: 'فواتير مبيعات الأخشاب', en: 'Wood Sales Invoices' },
     purchases: { ar: 'فواتير مشتريات وتوريد الأخشاب', en: 'Wood Purchase Invoices' },
+    returns: { ar: 'مرتجعات الألواح والخشب', en: 'Returns Management' },
     customers: { ar: 'سجل العملاء وكشوف الحساب', en: 'Customers Ledger' },
     suppliers: { ar: 'سجل الموردين والمصانع', en: 'Suppliers Ledger' },
     payments: { ar: 'المدفوعات والتحصيلات', en: 'Payments & Collections' },
@@ -656,6 +859,7 @@ export function App() {
           setIsSidebarOpen(false);
           localStorage.setItem('nileflow_sidebar_open', 'false');
         }}
+        onOpenBackup={() => setIsBackupModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -670,6 +874,7 @@ export function App() {
           activeTabTitle={language === 'ar' ? tabTitles[activeTab]?.ar : tabTitles[activeTab]?.en}
           isSidebarOpen={isSidebarOpen}
           onToggleSidebar={toggleSidebar}
+          onOpenBackup={() => setIsBackupModalOpen(true)}
         />
 
         {/* Page Content */}
@@ -748,6 +953,24 @@ export function App() {
             />
           )}
 
+          {activeTab === 'returns' && (
+            <ReturnsPage
+              salesInvoices={salesInvoices}
+              purchaseInvoices={purchaseInvoices}
+              customers={customers}
+              suppliers={suppliers}
+              products={products}
+              warehouses={warehouses}
+              language={language}
+              onCreateSalesReturn={handleCreateSalesReturn}
+              onCreatePurchaseReturn={handleCreatePurchaseReturn}
+              onDeleteInvoice={async (id, type) => {
+                if (type === 'sales') await handleDeleteSalesInvoice(id);
+                else await handleDeletePurchaseInvoice(id);
+              }}
+            />
+          )}
+
           {activeTab === 'customers' && (
             <CustomersPage
               customers={customers}
@@ -804,6 +1027,22 @@ export function App() {
           )}
         </main>
       </div>
+
+      {/* Full Database Backup & Excel Export Modal */}
+      {isBackupModalOpen && (
+        <BackupModal
+          products={products}
+          customers={customers}
+          suppliers={suppliers}
+          warehouses={warehouses}
+          salesInvoices={salesInvoices}
+          purchaseInvoices={purchaseInvoices}
+          stockMovements={stockMovements}
+          financialTransactions={transactions}
+          language={language}
+          onClose={() => setIsBackupModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

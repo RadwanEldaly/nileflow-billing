@@ -180,14 +180,16 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({
         p.wood_type.toLowerCase().includes(productQuery.toLowerCase())
       ).slice(0, 15);
 
-  const filteredInvoices = purchaseInvoices.filter((inv) => {
-    const sup = suppliers.find((s) => s.id === inv.supplier_id);
-    const matchesSearch =
-      inv.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (sup && sup.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesSup = selectedSupplierId === 'all' || inv.supplier_id === selectedSupplierId;
-    return matchesSearch && matchesSup;
-  });
+  const filteredInvoices = purchaseInvoices
+    .filter((inv) => !inv.invoice_number.startsWith('RET-'))
+    .filter((inv) => {
+      const sup = suppliers.find((s) => s.id === inv.supplier_id);
+      const matchesSearch =
+        inv.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (sup && sup.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesSup = selectedSupplierId === 'all' || inv.supplier_id === selectedSupplierId;
+      return matchesSearch && matchesSup;
+    });
 
   return (
     <div className="space-y-4">

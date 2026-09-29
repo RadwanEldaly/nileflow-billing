@@ -1,5 +1,4 @@
-import React from 'react';
-import { Menu, Globe, RefreshCw, LogOut, ShieldCheck, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Menu, Globe, RefreshCw, LogOut, ShieldCheck, ChevronRight, ChevronLeft, Database } from 'lucide-react';
 
 interface HeaderProps {
   language: 'ar' | 'en';
@@ -11,6 +10,7 @@ interface HeaderProps {
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   onToggleMobileSidebar?: () => void;
+  onOpenBackup?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -23,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   isSidebarOpen = true,
   onToggleSidebar,
   onToggleMobileSidebar,
+  onOpenBackup,
 }) => {
   const handleToggle = onToggleSidebar || onToggleMobileSidebar;
 
@@ -91,6 +92,20 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Tools & User Profile */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Quick Backup & Export Button */}
+          {onOpenBackup && (
+            <button
+              onClick={onOpenBackup}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-xs font-bold text-amber-300 border border-amber-500/30 transition cursor-pointer shadow-xs active:scale-95"
+              title={language === 'ar' ? 'النسخ الاحتياطي وتصدير البيانات' : 'Backup & Export'}
+            >
+              <Database className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline text-[11px] font-bold">
+                {language === 'ar' ? 'نسخ احتياطي' : 'Backup'}
+              </span>
+            </button>
+          )}
+
           {/* Language Toggle */}
           <button
             onClick={() => onLanguageChange(language === 'ar' ? 'en' : 'ar')}

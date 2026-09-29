@@ -240,14 +240,16 @@ export const SalesPage: React.FC<SalesPageProps> = ({
         (p.category && p.category.toLowerCase().includes(productQuery.toLowerCase()))
       ).slice(0, 15);
 
-  const filteredInvoices = salesInvoices.filter((inv) => {
-    const cust = customers.find((c) => c.id === inv.customer_id);
-    const matchesSearch =
-      inv.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (cust && cust.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesCust = selectedCustomerId === 'all' || inv.customer_id === selectedCustomerId;
-    return matchesSearch && matchesCust;
-  });
+  const filteredInvoices = salesInvoices
+    .filter((inv) => !inv.invoice_number.startsWith('RET-'))
+    .filter((inv) => {
+      const cust = customers.find((c) => c.id === inv.customer_id);
+      const matchesSearch =
+        inv.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (cust && cust.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesCust = selectedCustomerId === 'all' || inv.customer_id === selectedCustomerId;
+      return matchesSearch && matchesCust;
+    });
 
   return (
     <div className="space-y-4">

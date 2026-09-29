@@ -1,15 +1,16 @@
-import React from 'react';
 import {
   LayoutDashboard,
   Trees,
   Warehouse,
   Receipt,
   ShoppingBag,
+  RotateCcw,
   Users,
   Truck,
   CreditCard,
   FileSpreadsheet,
   BarChart3,
+  Database,
   X,
   ChevronLeft,
   ChevronRight,
@@ -22,6 +23,7 @@ export type NavTab =
   | 'warehouses'
   | 'sales'
   | 'purchases'
+  | 'returns'
   | 'customers'
   | 'suppliers'
   | 'payments'
@@ -34,6 +36,7 @@ interface NavigationProps {
   language: 'ar' | 'en';
   isOpen?: boolean;
   onClose?: () => void;
+  onOpenBackup?: () => void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
@@ -42,6 +45,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   language,
   isOpen = false,
   onClose,
+  onOpenBackup,
 }) => {
   const navSections = [
     {
@@ -89,6 +93,12 @@ export const Navigation: React.FC<NavigationProps> = ({
           labelAr: 'فواتير المشتريات والتوريد',
           labelEn: 'Purchase Invoices',
           icon: ShoppingBag,
+        },
+        {
+          id: 'returns' as NavTab,
+          labelAr: 'مرتجعات الألواح والخشب',
+          labelEn: 'Returns Management',
+          icon: RotateCcw,
         },
         {
           id: 'payments' as NavTab,
@@ -243,6 +253,22 @@ export const Navigation: React.FC<NavigationProps> = ({
 
           {/* Sidebar Footer */}
           <div className="p-3 border-t border-slate-800/90 bg-[#080d18] text-xs">
+            {onOpenBackup && (
+              <button
+                onClick={onOpenBackup}
+                className="w-full mb-2.5 flex items-center justify-between px-3 py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs transition cursor-pointer group shadow-xs active:scale-[0.98]"
+                title="تصدير نسخة احتياطية وحفظ البيانات"
+              >
+                <span className="flex items-center gap-2">
+                  <Database className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                  <span>{language === 'ar' ? 'نسخ احتياطي للبيانات' : 'Backup & Export'}</span>
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono font-medium">
+                  Backup
+                </span>
+              </button>
+            )}
+
             <div className="flex items-center justify-between px-2 py-1.5 rounded-md bg-slate-900/60 border border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
