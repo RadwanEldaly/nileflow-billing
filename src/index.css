@@ -123,6 +123,76 @@ main {
   }
 }
 
+/* Luxury Splash & Loading Screen Animations */
+@keyframes spinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes reverseSpinSlow {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(0.98);
+    filter: drop-shadow(0 0 20px rgba(245, 158, 11, 0.3));
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.04);
+    filter: drop-shadow(0 0 40px rgba(245, 158, 11, 0.65));
+  }
+}
+
+@keyframes shimmerProgress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-spin-slow {
+  animation: spinSlow 14s linear infinite;
+}
+
+.animate-reverse-spin-slow {
+  animation: reverseSpinSlow 18s linear infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3.5s ease-in-out infinite;
+}
+
+.animate-float-gentle {
+  animation: floatGentle 4s ease-in-out infinite;
+}
+
+.animate-shimmer-progress {
+  animation: shimmerProgress 1.6s ease-in-out infinite;
+}
+
 /* Custom Sleek Scrollbar */
 ::-webkit-scrollbar {
   width: 7px;

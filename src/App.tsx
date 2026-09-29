@@ -26,6 +26,7 @@ import { PaymentsPage } from './pages/PaymentsPage';
 import { ImportPage } from './pages/ImportPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { BackupModal } from './components/BackupModal';
+import { LoadingScreen } from './components/LoadingScreen';
 
 export function App() {
   const [language, setLanguage] = useState<'ar' | 'en'>('ar');
@@ -48,7 +49,12 @@ export function App() {
     });
   };
   const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('nileflow_auth') === 'true';
+    }
+    return false;
+  });
 
   useEffect(() => {
     if (localStorage.getItem('nileflow_auth') === 'true') {
@@ -89,6 +95,7 @@ export function App() {
 
   const fetchInitialData = async () => {
     setIsLoading(true);
+    const startTime = Date.now();
     try {
       const [whRes, custRes, supRes, prodRes, salesRes, purchRes, movRes, txRes] = await Promise.all([
         supabase.from('warehouses').select('*'),
@@ -120,7 +127,15 @@ export function App() {
     } catch (error) {
       console.error('Error fetching data from Supabase:', error);
     } finally {
-      setIsLoading(false);
+      const elapsed = Date.now() - startTime;
+      const minDisplayDuration = 2200; // Allow luxury branded splash animation to play smoothly
+      if (elapsed < minDisplayDuration) {
+        setTimeout(() => {
+          setIsLoading(false);
+        }, minDisplayDuration - elapsed);
+      } else {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -813,16 +828,19 @@ export function App() {
   };
 
   if (!isAuthenticated) {
-    return <LoginScreen language={language} onLoginSuccess={() => setIsAuthenticated(true)} />;
+    return (
+      <LoginScreen
+        language={language}
+        onLoginSuccess={() => {
+          setIsAuthenticated(true);
+          fetchInitialData();
+        }}
+      />
+    );
   }
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0b0f19] flex flex-col items-center justify-center gap-3">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-slate-800 border-t-amber-500"></div>
-        <span className="text-xs text-slate-400 font-mono tracking-wider">جاري تحميل بيانات النظام...</span>
-      </div>
-    );
+    return <LoadingScreen language={language} />;
   }
 
   const tabTitles: Record<NavTab, { ar: string; en: string }> = {
