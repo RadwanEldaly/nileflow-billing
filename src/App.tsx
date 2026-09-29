@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { supabase } from './lib/supabaseClient';
 import {
   Customer,
@@ -800,6 +801,7 @@ export function App() {
           )}
         </main>
       </div>
+      <SpeedInsights />
     </div>
   );
 }
