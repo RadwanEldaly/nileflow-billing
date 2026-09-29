@@ -69,130 +69,136 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     .slice(0, 5);
 
   return (
-    <div className="space-y-6">
-      {/* Executive Welcome Banner */}
-      <div className="bg-gradient-to-r from-amber-900 via-slate-900 to-slate-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden border border-amber-800/40">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 bg-amber-500/20 text-amber-300 text-xs px-3 py-1 rounded-full border border-amber-400/30 mb-2">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{language === 'ar' ? 'شركة الدالي لتجارة الأخشاب - البدرشين' : 'El-Daly Wood Trading HQ'}</span>
+    <div className="space-y-5">
+      {/* Executive Overview Header */}
+      <div className="bg-[#0e1424] rounded-lg p-5 border border-slate-800 text-slate-100 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <img
+              src="/logo.png"
+              alt="شركة الدالي لتجارة الأخشاب والقشرة"
+              className="w-16 h-16 object-contain shrink-0 drop-shadow-xl hidden sm:block rounded-full bg-black/40 p-1 border border-amber-500/30"
+            />
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 mb-2">
+                <Sparkles className="w-3 h-3" />
+                <span>{language === 'ar' ? 'شركة الدالي لتجارة الأخشاب والقشرة - البدرشين' : 'El-Daly Wood & Veneer Trading HQ'}</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+                {language === 'ar' ? 'لوحة المتابعة الإدارية للمخزون والماليات' : 'Executive Wood Trading Control Panel'}
+              </h2>
+              <p className="text-slate-300 text-xs mt-1 max-w-2xl leading-relaxed font-medium">
+                {language === 'ar'
+                  ? 'مراقبة حركة الألواح الخشبية (MDF، كونتر، أبلكاش، قشرة)، الفواتير، ومدفوعات العملاء والموردين بدقة تجارية.'
+                  : 'Monitor sheet inventory movements, invoices, customer and supplier ledgers with financial precision.'}
+              </p>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-              {language === 'ar' ? 'لوحة المراقبة الإدارية للمخزون والمبيعات' : 'Executive Wood Trading Control Panel'}
-            </h2>
-            <p className="text-slate-300 text-sm mt-1 max-w-2xl">
-              {language === 'ar'
-                ? 'إدارة الألواح الخشبية بحساب عدد الألواح، متابعة المخازن، فواتير المبيعات والمشتريات، وكشوف حساب العملاء والموردين.'
-                : 'Manage wooden sheet inventory, multi-warehouse stock movements, sales, purchasing, and ledgers.'}
-            </p>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={onOpenNewSale}
-              className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg transition"
+              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs px-3.5 py-2 rounded-md shadow-xs transition active:scale-[0.99]"
             >
-              <PlusCircle className="w-4 h-4" />
+              <PlusCircle className="w-3.5 h-3.5" />
               <span>{language === 'ar' ? 'فاتورة بيع ألواح' : 'New Sales Invoice'}</span>
             </button>
             <button
               onClick={onOpenNewPurchase}
-              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl border border-slate-700 transition"
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 font-medium text-xs px-3.5 py-2 rounded-md border border-slate-700/80 transition"
             >
-              <ShoppingBag className="w-4 h-4 text-emerald-400" />
+              <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" />
               <span>{language === 'ar' ? 'فاتورة شراء أخشاب' : 'New Purchase'}</span>
             </button>
             <button
               onClick={() => onNavigate('import')}
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow transition"
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 font-medium text-xs px-3.5 py-2 rounded-md border border-slate-700/80 transition"
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>{language === 'ar' ? 'استيراد إكسيل الأخشاب' : 'Import Excel'}</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
+              <span>{language === 'ar' ? 'استيراد إكسيل' : 'Import Excel'}</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Main Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Main Financial & Inventory Metrics Strip */}
+      <div className="bg-[#0e1424] rounded-lg border border-slate-800 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-800 rtl:sm:divide-x-reverse overflow-hidden shadow-xs">
         {/* Total Sheet Stock Count */}
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="p-4.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               {language === 'ar' ? 'إجمالي الألواح بالمخازن' : 'Total Sheets in Stock'}
             </span>
-            <div className="p-2.5 bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 rounded-xl">
-              <Trees className="w-5 h-5" />
+            <div className="p-1.5 bg-amber-500/10 text-amber-400 rounded border border-amber-500/20">
+              <Trees className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-slate-900 dark:text-white">
-              {totalSheetsInStock.toLocaleString()} <span className="text-xs font-normal text-slate-500">لوح خشب</span>
+          <div className="mt-2.5">
+            <div className="text-2xl font-bold font-mono tracking-tight text-slate-100 tabular-nums">
+              {totalSheetsInStock.toLocaleString()} <span className="text-xs font-normal text-slate-400">لوح خشب</span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-[11px] text-slate-400 mt-1 font-mono">
               {language === 'ar' ? `قيمة التكلفة: ${totalStockValuation.toLocaleString()} ج.م` : `Valuation: ${totalStockValuation.toLocaleString()} EGP`}
             </p>
           </div>
         </div>
 
         {/* Current Month Sales */}
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="p-4.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               {language === 'ar' ? 'مبيعات الشهر الحالي' : 'Monthly Sales'}
             </span>
-            <div className="p-2.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 rounded-xl">
-              <DollarSign className="w-5 h-5" />
+            <div className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded border border-emerald-500/20">
+              <DollarSign className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-slate-900 dark:text-white">
-              {monthlySales.toLocaleString()} <span className="text-xs font-normal text-slate-500">ج.م (EGP)</span>
+          <div className="mt-2.5">
+            <div className="text-2xl font-bold font-mono tracking-tight text-slate-100 tabular-nums">
+              {monthlySales.toLocaleString()} <span className="text-xs font-normal text-slate-400">ج.م</span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              {language === 'ar' ? `إجمالي المبيعات التاريخية: ${totalAllSales.toLocaleString()} ج.م` : `All-time Sales: ${totalAllSales.toLocaleString()} EGP`}
+            <p className="text-[11px] text-slate-400 mt-1 font-mono">
+              {language === 'ar' ? `إجمالي المبيعات: ${totalAllSales.toLocaleString()} ج.م` : `All-time Sales: ${totalAllSales.toLocaleString()} EGP`}
             </p>
           </div>
         </div>
 
         {/* Customer Receivables */}
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="p-4.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               {language === 'ar' ? 'ديون مستحقة على العملاء' : 'Customer Receivables'}
             </span>
-            <div className="p-2.5 bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 rounded-xl">
-              <Users className="w-5 h-5" />
+            <div className="p-1.5 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20">
+              <Users className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-blue-600 dark:text-blue-400">
-              {totalCustomerReceivables.toLocaleString()} <span className="text-xs font-normal text-slate-500">ج.م</span>
+          <div className="mt-2.5">
+            <div className="text-2xl font-bold font-mono tracking-tight text-amber-400 tabular-nums">
+              {totalCustomerReceivables.toLocaleString()} <span className="text-xs font-normal text-slate-400">ج.م</span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-[11px] text-slate-400 mt-1 font-mono">
               {language === 'ar' ? `عدد العملاء المسجلين: ${customers.length}` : `Customers count: ${customers.length}`}
             </p>
           </div>
         </div>
 
         {/* Supplier Payables */}
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="p-4.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               {language === 'ar' ? 'مستحقات واجبة للموردين' : 'Supplier Payables'}
             </span>
-            <div className="p-2.5 bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 rounded-xl">
-              <Truck className="w-5 h-5" />
+            <div className="p-1.5 bg-indigo-500/10 text-indigo-400 rounded border border-indigo-500/20">
+              <Truck className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
-              {totalSupplierPayables.toLocaleString()} <span className="text-xs font-normal text-slate-500">ج.م</span>
+          <div className="mt-2.5">
+            <div className="text-2xl font-bold font-mono tracking-tight text-slate-200 tabular-nums">
+              {totalSupplierPayables.toLocaleString()} <span className="text-xs font-normal text-slate-400">ج.م</span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-[11px] text-slate-400 mt-1 font-mono">
               {language === 'ar' ? `إجمالي المشتريات: ${totalAllPurchases.toLocaleString()} ج.م` : `All-time Purchases: ${totalAllPurchases.toLocaleString()} EGP`}
             </p>
           </div>
@@ -201,21 +207,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
       {/* Low Stock Warning Alert */}
       {lowStockProducts.length > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-2xl p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+        <div className="bg-amber-950/20 border border-amber-900/40 rounded-lg p-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
             <div>
-              <div className="text-sm font-bold text-amber-900 dark:text-amber-200">
+              <div className="text-xs font-bold text-amber-200">
                 {language === 'ar' ? `تنبيه: يوجد (${lowStockProducts.length}) أصناف ألواح خشبية قرب النفاد!` : `Warning: (${lowStockProducts.length}) items are near minimum stock!`}
               </div>
-              <div className="text-xs text-amber-700 dark:text-amber-400">
+              <div className="text-[11px] text-amber-300/80 mt-0.5">
                 {lowStockProducts.slice(0, 3).map((p) => `${p.name} (${p.stock_quantity} لوح)`).join(' • ')}
               </div>
             </div>
           </div>
           <button
             onClick={() => onNavigate('products')}
-            className="text-xs bg-amber-600 hover:bg-amber-500 text-white font-bold px-3.5 py-2 rounded-xl transition"
+            className="text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold px-3 py-1.5 rounded-md border border-amber-500/30 transition"
           >
             {language === 'ar' ? 'عرض الأصناف المنخفضة' : 'View Low Stock'}
           </button>
@@ -223,17 +229,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       )}
 
       {/* Recent Sales Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+      <div className="bg-[#0e1424] rounded-lg border border-slate-800 overflow-hidden shadow-xs">
+        <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/40">
           <div className="flex items-center gap-2">
-            <Receipt className="w-5 h-5 text-amber-600" />
-            <h3 className="font-bold text-slate-900 dark:text-white">
+            <Receipt className="w-4 h-4 text-amber-400" />
+            <h3 className="font-semibold text-xs text-slate-200 uppercase tracking-wider">
               {language === 'ar' ? 'أحدث فواتير مبيعات الأخشاب' : 'Recent Wood Sales Invoices'}
             </h3>
           </div>
           <button
             onClick={() => onNavigate('sales')}
-            className="text-xs text-amber-600 hover:text-amber-700 font-bold flex items-center gap-1"
+            className="text-xs text-amber-400 hover:text-amber-300 font-medium flex items-center gap-1 transition"
           >
             <span>{language === 'ar' ? 'عرض الفواتير كاملة' : 'View All Invoices'}</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
@@ -242,34 +248,34 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
         {recentSales.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-right rtl:text-right ltr:text-left">
-              <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 uppercase text-xs">
+            <table className="w-full text-xs text-right rtl:text-right ltr:text-left">
+              <thead className="bg-[#090d16] text-slate-400 uppercase text-[11px] border-b border-slate-800">
                 <tr>
-                  <th className="px-6 py-3.5">{language === 'ar' ? 'رقم الفاتورة' : 'Invoice #'}</th>
-                  <th className="px-6 py-3.5">{language === 'ar' ? 'العميل' : 'Customer'}</th>
-                  <th className="px-6 py-3.5">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
-                  <th className="px-6 py-3.5">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
-                  <th className="px-6 py-3.5">{language === 'ar' ? 'المدفوع' : 'Paid'}</th>
-                  <th className="px-6 py-3.5">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
+                  <th className="px-4 py-2.5 font-semibold">{language === 'ar' ? 'رقم الفاتورة' : 'Invoice #'}</th>
+                  <th className="px-4 py-2.5 font-semibold">{language === 'ar' ? 'العميل' : 'Customer'}</th>
+                  <th className="px-4 py-2.5 font-semibold">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                  <th className="px-4 py-2.5 font-semibold">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
+                  <th className="px-4 py-2.5 font-semibold">{language === 'ar' ? 'المدفوع' : 'Paid'}</th>
+                  <th className="px-4 py-2.5 font-semibold">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+              <tbody className="divide-y divide-slate-800/60">
                 {recentSales.map((inv) => {
                   const cust = customers.find((c) => c.id === inv.customer_id);
                   return (
-                    <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                      <td className="px-6 py-4 font-mono font-bold text-amber-700 dark:text-amber-400">{inv.invoice_number}</td>
-                      <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">
+                    <tr key={inv.id} className="hover:bg-slate-850/50 transition">
+                      <td className="px-4 py-3 font-mono font-semibold text-amber-400/90">{inv.invoice_number}</td>
+                      <td className="px-4 py-3 font-semibold text-slate-200">
                         {cust?.name || 'عميل'}
                       </td>
-                      <td className="px-6 py-4 text-slate-500">{inv.invoice_date}</td>
-                      <td className="px-6 py-4 font-extrabold text-slate-900 dark:text-white">
+                      <td className="px-4 py-3 text-slate-400 font-mono">{inv.invoice_date}</td>
+                      <td className="px-4 py-3 font-bold font-mono text-slate-100 tabular-nums">
                         {inv.total.toLocaleString()} EGP
                       </td>
-                      <td className="px-6 py-4 font-bold text-emerald-600">
+                      <td className="px-4 py-3 font-semibold font-mono text-emerald-400 tabular-nums">
                         {inv.paid_amount.toLocaleString()} EGP
                       </td>
-                      <td className="px-6 py-4 font-bold text-red-600">
+                      <td className="px-4 py-3 font-semibold font-mono text-rose-400 tabular-nums">
                         {inv.remaining_balance.toLocaleString()} EGP
                       </td>
                     </tr>
@@ -279,26 +285,26 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             </table>
           </div>
         ) : (
-          <div className="p-12 text-center text-slate-400">
-            <Trees className="w-12 h-12 mx-auto text-amber-300 mb-3" />
-            <p className="font-bold text-slate-700 dark:text-slate-300">
+          <div className="p-10 text-center text-slate-400">
+            <Trees className="w-10 h-10 mx-auto text-amber-500/40 mb-2.5" />
+            <p className="font-semibold text-xs text-slate-300">
               {language === 'ar' ? 'مرحباً بك في نظام شركة الدالي لتجارة الأخشاب' : 'Welcome to El-Daly Wood System'}
             </p>
-            <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+            <p className="text-[11px] text-slate-500 mt-1 max-w-md mx-auto">
               {language === 'ar'
                 ? 'ابدأ باستيراد منتجات الأخشاب من ملف Excel أو قم بإصدار أول فاتورة مبيعات لألواح الأخشاب.'
                 : 'Start by importing wood products from Excel or issuing your first sales invoice.'}
             </p>
-            <div className="mt-4 flex items-center justify-center gap-3">
+            <div className="mt-4 flex items-center justify-center gap-2">
               <button
                 onClick={() => onNavigate('import')}
-                className="bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-emerald-600 transition"
+                className="bg-slate-900 border border-slate-700 hover:bg-slate-850 text-slate-200 text-xs font-medium px-3.5 py-2 rounded-md transition"
               >
-                {language === 'ar' ? 'استيراد منتجات الأخشاب من Excel' : 'Import Wood Products Excel'}
+                {language === 'ar' ? 'استيراد منتجات الأخشاب' : 'Import Excel'}
               </button>
               <button
                 onClick={onOpenNewSale}
-                className="bg-amber-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-amber-500 transition"
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-semibold px-3.5 py-2 rounded-md transition"
               >
                 {language === 'ar' ? '+ فاتورة بيع جديدة' : '+ New Invoice'}
               </button>

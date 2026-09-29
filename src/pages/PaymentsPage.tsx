@@ -46,24 +46,24 @@ export const PaymentsPage: React.FC<PaymentsPageProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <CreditCard className="w-6 h-6 text-amber-600" />
+          <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-amber-400" />
             <span>{language === 'ar' ? 'إدارة التحصيلات والمدفوعات المالية' : 'Payments & Collections'}</span>
           </h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-400 mt-0.5">
             {language === 'ar'
-              ? 'تسجيل تحصيلات المبالغ من العملاء وسداد الدفعات للموردين لتحديث الحسابات آلياً'
+              ? 'تسجيل تحصيلات النقدية من العملاء وسداد دفعات الموردين وتحديث الأرصدة تلقائياً'
               : 'Record customer collections and supplier payments.'}
           </p>
         </div>
 
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-sm transition"
+          className="flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs px-3.5 py-2 rounded-md shadow-xs transition active:scale-[0.99]"
         >
           <Plus className="w-4 h-4" />
           <span>{language === 'ar' ? 'تسجيل إيصال تحصيل / دفع' : 'Record Payment'}</span>
@@ -71,21 +71,21 @@ export const PaymentsPage: React.FC<PaymentsPageProps> = ({
       </div>
 
       {/* Transactions Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+      <div className="bg-[#0e1424] rounded-lg border border-slate-800/80 overflow-hidden shadow-xs">
         {transactions.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-right rtl:text-right ltr:text-left">
-              <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 text-xs uppercase border-b border-slate-200 dark:border-slate-700">
+            <table className="w-full text-xs text-right rtl:text-right ltr:text-left">
+              <thead className="bg-slate-900/90 text-slate-400 text-[11px] font-semibold border-b border-slate-800">
                 <tr>
-                  <th className="px-6 py-3.5">التاريخ</th>
-                  <th className="px-6 py-3.5">نوع العملية</th>
-                  <th className="px-6 py-3.5">الطرف (العميل / المورد)</th>
-                  <th className="px-6 py-3.5">المبلغ</th>
-                  <th className="px-6 py-3.5">طريقة الدفع</th>
-                  <th className="px-6 py-3.5">ملاحظات</th>
+                  <th className="px-4 py-3">التاريخ</th>
+                  <th className="px-4 py-3">نوع الحركة المالية</th>
+                  <th className="px-4 py-3">الطرف المعني (العميل / المورد)</th>
+                  <th className="px-4 py-3 text-left">المبلغ</th>
+                  <th className="px-4 py-3">طريقة الدفع</th>
+                  <th className="px-4 py-3">ملاحظات الإيصال</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+              <tbody className="divide-y divide-slate-800/60">
                 {transactions.map((t) => {
                   const isCustomer = t.party_type === 'customer';
                   const partyName = isCustomer
@@ -93,25 +93,43 @@ export const PaymentsPage: React.FC<PaymentsPageProps> = ({
                     : suppliers.find((s) => s.id === t.party_id)?.name;
 
                   return (
-                    <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                      <td className="px-6 py-4 font-mono text-slate-500 text-xs">{t.transaction_date}</td>
-                      <td className="px-6 py-4">
+                    <tr key={t.id} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="px-4 py-3 font-mono tabular-nums text-slate-400 text-[11px]">
+                        {t.transaction_date}
+                      </td>
+                      <td className="px-4 py-3">
                         <span
-                          className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                            isCustomer ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${
+                            isCustomer
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                              : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                           }`}
                         >
-                          {isCustomer ? 'تحصيل من عميل (+)' : 'سداد لمورد (-)'}
+                          {isCustomer ? (
+                            <>
+                              <ArrowDownLeft className="w-3 h-3 text-emerald-400" />
+                              <span>تحصيل من عميل (+)</span>
+                            </>
+                          ) : (
+                            <>
+                              <ArrowUpRight className="w-3 h-3 text-amber-400" />
+                              <span>سداد دفعة لمورد (-)</span>
+                            </>
+                          )}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-extrabold text-slate-900 dark:text-white">{partyName || 'طرف مجهول'}</td>
-                      <td className="px-6 py-4 font-black font-mono">
-                        <span className={isCustomer ? 'text-emerald-600' : 'text-blue-600'}>
-                          {t.amount.toLocaleString()} EGP
+                      <td className="px-4 py-3 font-medium text-slate-100 text-xs">
+                        {partyName || 'طرف غير محدد'}
+                      </td>
+                      <td className="px-4 py-3 text-left font-mono tabular-nums font-bold text-xs">
+                        <span className={isCustomer ? 'text-emerald-400' : 'text-amber-400'}>
+                          {t.amount.toLocaleString()} <span className="text-[10px] font-normal text-slate-400">ج.م</span>
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-xs text-slate-600">{t.payment_method === 'cash' ? 'نقداً (كاش)' : t.payment_method}</td>
-                      <td className="px-6 py-4 text-xs text-slate-500">{t.notes || '-'}</td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {t.payment_method === 'cash' ? 'نقداً (كاش خزانة)' : t.payment_method}
+                      </td>
+                      <td className="px-4 py-3 text-slate-400 text-[11px]">{t.notes || '—'}</td>
                     </tr>
                   );
                 })}
@@ -120,9 +138,14 @@ export const PaymentsPage: React.FC<PaymentsPageProps> = ({
           </div>
         ) : (
           <div className="p-12 text-center text-slate-400">
-            <CreditCard className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-            <p className="font-bold text-slate-700 dark:text-slate-300">
-              {language === 'ar' ? 'لا يوجد عمليات تحصيل أو سداد مسجلة' : 'No payments recorded yet'}
+            <CreditCard className="w-10 h-10 mx-auto text-slate-600 mb-2.5 stroke-[1.5]" />
+            <p className="font-semibold text-slate-300 text-sm">
+              {language === 'ar' ? 'لا توجد عمليات تحصيل أو سداد مسجلة' : 'No payments recorded yet'}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              {language === 'ar'
+                ? 'قم بتسجيل حركة تحصيل من عميل أو سداد لمورد لتسويتها في كشف الحساب'
+                : 'Record customer collections or supplier payments to balance ledgers'}
             </p>
           </div>
         )}
@@ -130,18 +153,24 @@ export const PaymentsPage: React.FC<PaymentsPageProps> = ({
 
       {/* Modal Add Transaction */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-slate-700">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">تسجيل إيصال سداد / تحصيل مالية</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-[#0e1424] rounded-xl max-w-md w-full p-5 shadow-2xl border border-slate-700/80 space-y-4 text-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-amber-400" />
+                <h3 className="text-sm font-bold text-slate-100">تسجيل حركة مالية — خزانة الدالي</h3>
+              </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-200 transition p-1"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
                   نوع الحركة المالية *
                 </label>
                 <select
@@ -150,22 +179,22 @@ export const PaymentsPage: React.FC<PaymentsPageProps> = ({
                     setTxType(e.target.value as any);
                     setPartyId('');
                   }}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold"
+                  className="w-full px-2.5 py-1.5 bg-[#0b0f19] border border-slate-700 rounded-md text-xs font-semibold text-slate-200 focus:outline-none focus:border-amber-500"
                 >
-                  <option value="customer_payment">تحصيل نقدية من عميل (+)</option>
-                  <option value="supplier_payment">سداد دفعة لمورد (-)</option>
+                  <option value="customer_payment">تحصيل نقدية من عميل (+ إيداع)</option>
+                  <option value="supplier_payment">سداد دفعة لمورد (- صرف)</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
                   {txType === 'customer_payment' ? 'اختر العميل *' : 'اختر المورد *'}
                 </label>
                 <select
                   required
                   value={partyId}
                   onChange={(e) => setPartyId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold"
+                  className="w-full px-2.5 py-1.5 bg-[#0b0f19] border border-slate-700 rounded-md text-xs font-medium text-slate-200 focus:outline-none focus:border-amber-500"
                 >
                   <option value="">-- اختر الطرف --</option>
                   {txType === 'customer_payment'
@@ -184,7 +213,7 @@ export const PaymentsPage: React.FC<PaymentsPageProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-[11px] font-medium text-slate-300 mb-1">
                     المبلغ بالجنيه (EGP) *
                   </label>
                   <input
@@ -193,48 +222,64 @@ export const PaymentsPage: React.FC<PaymentsPageProps> = ({
                     required
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-black text-amber-600"
+                    className="w-full px-2.5 py-1.5 bg-[#0b0f19] border border-slate-700 rounded-md text-xs font-mono font-bold text-amber-400 focus:outline-none focus:border-amber-500"
+                    placeholder="0.00"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    تاريخ العملية
+                  <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                    تاريخ السند
                   </label>
                   <input
                     type="date"
                     required
                     value={txDate}
                     onChange={(e) => setTxDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono font-bold"
+                    className="w-full px-2.5 py-1.5 bg-[#0b0f19] border border-slate-700 rounded-md text-xs font-mono font-medium text-slate-200 focus:outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  ملاحظات الإيصال
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                  طريقة الدفع
+                </label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-[#0b0f19] border border-slate-700 rounded-md text-xs font-medium text-slate-200 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="cash">نقداً (كاش خزانة)</option>
+                  <option value="bank_transfer">تحويل بنكي / إنستاباي</option>
+                  <option value="check">شيك بنكي</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                  ملاحظات الإيصال / رقم الشيك
                 </label>
                 <input
                   type="text"
-                  placeholder="مثال: سداد دفعة تحت الحساب كاش"
+                  placeholder="مثال: دفعة تحت الحساب كاش، أو رقم التحويل..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
+                  className="w-full px-2.5 py-1.5 bg-[#0b0f19] border border-slate-700 rounded-md text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-700"
+                  className="px-3 py-1.5 rounded-md text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white"
+                  className="px-4 py-1.5 rounded-md text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xs transition active:scale-[0.99]"
                 >
                   حفظ وتحديث الحساب
                 </button>

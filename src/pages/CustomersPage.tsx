@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Customer, SalesInvoice, FinancialTransaction } from '../types';
-import { Search, Plus, Phone, MapPin, FileText, DollarSign, X, CheckCircle2, User, Edit3, Trash2 } from 'lucide-react';
+import { Search, Plus, Phone, MapPin, FileText, X, User, Edit3, Trash2, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 
 interface CustomersPageProps {
   customers: Customer[];
@@ -84,7 +84,7 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
 
   const handleDeleteClick = (cust: Customer) => {
     const confirmed = window.confirm(
-      `متأكد إنك عايز تمسح العميل "${cust.name}" نهائيًا؟ الحذف ده مش هينفع ترجع فيه.`
+      `متأكد إنك تريد حذف بيانات العميل "${cust.name}" نهائيًا؟ لن يمكن التراجع عن هذا الإجراء.`
     );
     if (confirmed) {
       onDeleteCustomer(cust.id);
@@ -99,13 +99,20 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
     );
 
     const totalSalesSum = custInvoices.reduce((acc, i) => acc + i.total, 0);
-    const totalPaidSum = custInvoices.reduce((acc, i) => acc + i.paid_amount, 0) +
+    const totalPaidSum =
+      custInvoices.reduce((acc, i) => acc + i.paid_amount, 0) +
       custPayments.reduce((acc, p) => acc + p.amount, 0);
 
     const netDebtBalance = Math.max(0, totalSalesSum - totalPaidSum);
 
-    // Merge history into single chronological array
-    const ledgerItems: { date: string; type: string; ref: string; debit: number; credit: number; notes: string }[] = [];
+    const ledgerItems: {
+      date: string;
+      type: string;
+      ref: string;
+      debit: number;
+      credit: number;
+      notes: string;
+    }[] = [];
 
     custInvoices.forEach((inv) => {
       ledgerItems.push({
@@ -135,17 +142,17 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <User className="w-6 h-6 text-amber-600" />
+          <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+            <User className="w-5 h-5 text-amber-400" />
             <span>{language === 'ar' ? 'سجل العملاء وكشوف الحسابات' : 'Customers Ledger'}</span>
           </h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-400 mt-0.5">
             {language === 'ar'
-              ? 'إدارة بيانات النجارين والتجار، متابعة الرصيد المستحق، وطباعة كشف حساب عميل مفصل'
+              ? 'إدارة بيانات التجار والورش، متابعة الديون المستحقة، واستخراج كشف حساب مالي تفصيلي'
               : 'Search customers, track outstanding balances, and print detailed account statements.'}
           </p>
         </div>
@@ -156,7 +163,7 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
             setFormData({ code: '', name: '', mobile: '', address: '', notes: '' });
             setIsAddModalOpen(true);
           }}
-          className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-sm transition"
+          className="flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs px-3.5 py-2 rounded-md shadow-xs transition active:scale-[0.99]"
         >
           <Plus className="w-4 h-4" />
           <span>{language === 'ar' ? 'إضافة عميل جديد' : 'Add Customer'}</span>
@@ -164,77 +171,94 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row gap-4">
+      <div className="bg-[#0e1424] p-3 rounded-lg border border-slate-800/80 shadow-xs flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute top-3 right-3 text-slate-400 rtl:right-3 ltr:left-3" />
+          <Search className="w-4 h-4 absolute top-2.5 right-3 text-slate-500 rtl:right-3 ltr:left-3" />
           <input
             type="text"
-            placeholder={language === 'ar' ? 'ابحث باسم العميل، الكود، أو رقم التلفون...' : 'Search customer name, code, or mobile...'}
+            placeholder={
+              language === 'ar'
+                ? 'ابحث باسم العميل، الكود، رقم الهاتف، أو المنطقة...'
+                : 'Search customer name, code, or mobile...'
+            }
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-10 rtl:pr-10 rtl:pl-4 ltr:pl-10 ltr:pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+            className="w-full pl-3 pr-9 rtl:pr-9 rtl:pl-3 ltr:pl-9 ltr:pr-3 py-1.5 bg-[#0b0f19] border border-slate-700/80 rounded-md text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/70 focus:ring-1 focus:ring-amber-500/70"
           />
         </div>
       </div>
 
       {/* Customers Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+      <div className="bg-[#0e1424] rounded-lg border border-slate-800/80 overflow-hidden shadow-xs">
         {filteredCustomers.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-right rtl:text-right ltr:text-left">
-              <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 text-xs uppercase border-b border-slate-200 dark:border-slate-700">
+            <table className="w-full text-xs text-right rtl:text-right ltr:text-left">
+              <thead className="bg-slate-900/90 text-slate-400 text-[11px] font-semibold border-b border-slate-800">
                 <tr>
-                  <th className="px-6 py-3.5">كود العميل</th>
-                  <th className="px-6 py-3.5">اسم العميل</th>
-                  <th className="px-6 py-3.5">رقم التلفون</th>
-                  <th className="px-6 py-3.5">العنوان</th>
-                  <th className="px-6 py-3.5">تاريخ الإضافة</th>
-                  <th className="px-6 py-3.5">الرصيد المستحق (دين)</th>
-                  <th className="px-6 py-3.5 text-center">كشف الحساب</th>
-                  <th className="px-6 py-3.5 text-center">إجراءات</th>
+                  <th className="px-4 py-3">كود العميل</th>
+                  <th className="px-4 py-3">اسم العميل</th>
+                  <th className="px-4 py-3">رقم الهاتف</th>
+                  <th className="px-4 py-3">العنوان / المنطقة</th>
+                  <th className="px-4 py-3">تاريخ الإضافة</th>
+                  <th className="px-4 py-3 text-left">الرصيد المستحق (دين)</th>
+                  <th className="px-4 py-3 text-center">كشف الحساب</th>
+                  <th className="px-4 py-3 text-center">إجراءات</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+              <tbody className="divide-y divide-slate-800/60">
                 {filteredCustomers.map((cust) => {
                   const ledger = getCustomerLedger(cust);
                   return (
-                    <tr key={cust.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                      <td className="px-6 py-4 font-mono font-bold text-xs text-slate-500">{cust.code}</td>
-                      <td className="px-6 py-4 font-extrabold text-slate-900 dark:text-white">{cust.name}</td>
-                      <td className="px-6 py-4 font-mono text-slate-600 dark:text-slate-300 dir-ltr">{cust.mobile}</td>
-                      <td className="px-6 py-4 text-slate-500">{cust.address || '-'}</td>
-                      <td className="px-6 py-4 font-mono text-xs text-slate-500">
-                        {cust.created_at ? cust.created_at.slice(0, 10) : '-'}
+                    <tr key={cust.id} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="px-4 py-3 font-mono font-bold text-slate-400 text-[11px]">
+                        {cust.code}
                       </td>
-                      <td className="px-6 py-4 font-black">
-                        <span className={ledger.netDebtBalance > 0 ? 'text-red-600 font-black' : 'text-emerald-600'}>
-                          {ledger.netDebtBalance.toLocaleString()} EGP
-                        </span>
+                      <td className="px-4 py-3 font-medium text-slate-100 text-xs">
+                        {cust.name}
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-4 py-3 font-mono tabular-nums text-slate-300 dir-ltr text-xs">
+                        {cust.mobile}
+                      </td>
+                      <td className="px-4 py-3 text-slate-400 text-xs">{cust.address || '—'}</td>
+                      <td className="px-4 py-3 font-mono tabular-nums text-[11px] text-slate-500">
+                        {cust.created_at ? cust.created_at.slice(0, 10) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-left font-mono tabular-nums font-bold text-xs">
+                        {ledger.netDebtBalance > 0 ? (
+                          <span className="text-rose-400">
+                            {ledger.netDebtBalance.toLocaleString()}{' '}
+                            <span className="text-[10px] font-normal text-rose-500">ج.م</span>
+                          </span>
+                        ) : (
+                          <span className="text-emerald-400 font-semibold">
+                            0 <span className="text-[10px] font-normal text-emerald-600">ج.م (خالص)</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
                         <button
                           onClick={() => setSelectedCustomerForLedger(cust)}
-                          className="px-3.5 py-1.5 bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300 hover:bg-amber-100 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 mx-auto"
+                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 rounded text-[11px] font-medium transition inline-flex items-center gap-1"
                         >
-                          <FileText className="w-3.5 h-3.5" />
+                          <FileText className="w-3 h-3 text-amber-400" />
                           <span>عرض كشف الحساب</span>
                         </button>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => handleEditClick(cust)}
-                            title="تعديل"
-                            className="p-1.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 rounded-lg transition"
+                            title="تعديل بيانات العميل"
+                            className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded transition"
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteClick(cust)}
-                            title="حذف"
-                            className="p-1.5 bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 hover:bg-red-100 rounded-lg transition"
+                            title="حذف العميل"
+                            className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded transition"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
@@ -246,88 +270,110 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
           </div>
         ) : (
           <div className="p-12 text-center text-slate-400">
-            <p className="font-bold text-slate-700 dark:text-slate-300">
-              {language === 'ar' ? 'لم يتم العثور على عملاء' : 'No customers found'}
+            <User className="w-10 h-10 mx-auto text-slate-600 mb-2.5 stroke-[1.5]" />
+            <p className="font-semibold text-slate-300 text-sm">
+              {language === 'ar' ? 'لم يتم العثور على عملاء مسجلين' : 'No customers found'}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              {language === 'ar' ? 'قم بإضافة عميل جديد لمتابعة كشف حسابه ومبيعاته' : 'Add a new customer to track balance and sales'}
             </p>
           </div>
         )}
       </div>
 
-      {/* Modal Add Customer */}
+      {/* Modal Add / Edit Customer */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-slate-700">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                {editingCustomer ? `تعديل بيانات العميل: ${editingCustomer.name}` : 'إضافة عميل جديد - شركة الدالي'}
-              </h3>
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-[#0e1424] rounded-xl max-w-md w-full p-5 shadow-2xl border border-slate-700/80 space-y-4 text-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-amber-400" />
+                <h3 className="text-sm font-bold text-slate-100">
+                  {editingCustomer
+                    ? `تعديل بيانات العميل: ${editingCustomer.name}`
+                    : 'إضافة عميل جديد — شركة الدالي'}
+                </h3>
+              </div>
               <button
                 onClick={() => {
                   setIsAddModalOpen(false);
                   setEditingCustomer(null);
                 }}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 hover:text-slate-200 transition p-1"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitNew} className="space-y-4">
+            <form onSubmit={handleSubmitNew} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
                   اسم العميل *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="مثال: حسام الجيار"
+                  placeholder="مثال: م/ أحمد مصطفى (ورشة الجيار)"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
+                  className="w-full px-2.5 py-1.5 bg-[#0b0f19] border border-slate-700 rounded-md text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  رقم التلفون / الموبايل *
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                  رقم الهاتف / الموبايل *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="01119970044"
+                  placeholder="01012345678"
                   value={formData.mobile}
                   onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
+                  className="w-full px-2.5 py-1.5 bg-[#0b0f19] border border-slate-700 rounded-md text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
                   العنوان / المنطقة
                 </label>
                 <input
                   type="text"
-                  placeholder="البدرشين"
+                  placeholder="البدرشين، الجيزة"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
+                  className="w-full px-2.5 py-1.5 bg-[#0b0f19] border border-slate-700 rounded-md text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3">
+              <div>
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                  ملاحظات إضافية
+                </label>
+                <input
+                  type="text"
+                  placeholder="نوع التعامل أو سقف الائتمان..."
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  className="w-full px-2.5 py-1.5 bg-[#0b0f19] border border-slate-700 rounded-md text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => {
                     setIsAddModalOpen(false);
                     setEditingCustomer(null);
                   }}
-                  className="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-700"
+                  className="px-3 py-1.5 rounded-md text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white"
+                  className="px-4 py-1.5 rounded-md text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xs transition active:scale-[0.99]"
                 >
                   {editingCustomer ? 'حفظ التعديلات' : 'حفظ العميل'}
                 </button>
@@ -339,85 +385,105 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
 
       {/* Customer Account Statement Modal Drawer (كشف حساب عميل) */}
       {selectedCustomerForLedger && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-5 border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b pb-4 border-slate-200 dark:border-slate-700">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-[#0e1424] rounded-xl max-w-3xl w-full p-5 shadow-2xl space-y-4 border border-slate-700/80 max-h-[90vh] flex flex-col text-slate-100">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                  كشف حساب عميل: {selectedCustomerForLedger.name}
+                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-amber-400" />
+                  <span>كشف حساب عميل: {selectedCustomerForLedger.name}</span>
                 </h3>
-                <p className="text-xs text-slate-500 flex items-center gap-2 mt-1">
-                  <span>كود: {selectedCustomerForLedger.code}</span> • <span>تلفون: {selectedCustomerForLedger.mobile}</span> • <span>العنوان: {selectedCustomerForLedger.address || '-'}</span>
+                <p className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                  <span>كود: <strong className="font-mono text-slate-300">{selectedCustomerForLedger.code}</strong></span>
+                  <span>•</span>
+                  <span>هاتف: <strong className="font-mono text-slate-300">{selectedCustomerForLedger.mobile}</strong></span>
+                  <span>•</span>
+                  <span>العنوان: {selectedCustomerForLedger.address || '—'}</span>
                 </p>
               </div>
-              <button onClick={() => setSelectedCustomerForLedger(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-6 h-6" />
+              <button
+                onClick={() => setSelectedCustomerForLedger(null)}
+                className="text-slate-400 hover:text-slate-200 transition p-1"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {(() => {
               const ledger = getCustomerLedger(selectedCustomerForLedger);
               return (
-                <>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-                      <div className="text-[11px] text-slate-500 font-bold uppercase">إجمالي المبيعات</div>
-                      <div className="text-lg font-black text-slate-900 dark:text-white mt-1">
-                        {ledger.totalSalesSum.toLocaleString()} EGP
+                <div className="space-y-4 overflow-y-auto flex-1 pr-0.5">
+                  {/* Summary Metric Strip */}
+                  <div className="grid grid-cols-3 bg-[#0b0f19] rounded-lg border border-slate-800 divide-x divide-x-reverse divide-slate-800/80">
+                    <div className="p-3">
+                      <div className="text-[10px] text-slate-400 font-medium">إجمالي المبيعات</div>
+                      <div className="text-base font-black font-mono tabular-nums text-slate-100 mt-0.5">
+                        {ledger.totalSalesSum.toLocaleString()}{' '}
+                        <span className="text-[10px] font-normal text-slate-400">ج.م</span>
                       </div>
                     </div>
 
-                    <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-                      <div className="text-[11px] text-slate-500 font-bold uppercase">إجمالي المسدد</div>
-                      <div className="text-lg font-black text-emerald-600 mt-1">
-                        {ledger.totalPaidSum.toLocaleString()} EGP
+                    <div className="p-3">
+                      <div className="text-[10px] text-slate-400 font-medium">إجمالي المسدد</div>
+                      <div className="text-base font-black font-mono tabular-nums text-emerald-400 mt-0.5">
+                        {ledger.totalPaidSum.toLocaleString()}{' '}
+                        <span className="text-[10px] font-normal text-emerald-600">ج.م</span>
                       </div>
                     </div>
 
-                    <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded-xl border border-amber-200 dark:border-amber-900">
-                      <div className="text-[11px] text-amber-800 dark:text-amber-300 font-bold uppercase">الرصيد المتبقي (دين)</div>
-                      <div className="text-lg font-black text-red-600 mt-1">
-                        {ledger.netDebtBalance.toLocaleString()} EGP
+                    <div className="p-3">
+                      <div className="text-[10px] text-slate-400 font-medium">الرصيد المتبقي (دين)</div>
+                      <div className="text-base font-black font-mono tabular-nums text-rose-400 mt-0.5">
+                        {ledger.netDebtBalance.toLocaleString()}{' '}
+                        <span className="text-[10px] font-normal text-rose-500">ج.م</span>
                       </div>
                     </div>
                   </div>
 
+                  {/* Statement Table */}
                   <div>
-                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      الحركات المالية السابقة (الفواتير والتحصيلات)
+                    <h4 className="text-xs font-semibold text-slate-300 mb-2">
+                      سجل الحركات المالية المتبادلة (فواتير بيع وسندات تحصيل)
                     </h4>
                     {ledger.ledgerItems.length > 0 ? (
-                      <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-x-auto">
+                      <div className="border border-slate-800 rounded-lg overflow-x-auto">
                         <table className="w-full text-xs text-right">
-                          <thead className="bg-slate-100 dark:bg-slate-900 font-bold">
+                          <thead className="bg-slate-900/90 text-slate-400 text-[11px] font-semibold border-b border-slate-800">
                             <tr>
-                              <th className="p-2.5 border-b">التاريخ</th>
-                              <th className="p-2.5 border-b">نوع الحركة</th>
-                              <th className="p-2.5 border-b">المرجع</th>
-                              <th className="p-2.5 border-b">مدين (عنا)</th>
-                              <th className="p-2.5 border-b">دائن (مدفوع)</th>
-                              <th className="p-2.5 border-b">ملاحظات</th>
+                              <th className="p-2.5">التاريخ</th>
+                              <th className="p-2.5">نوع الحركة</th>
+                              <th className="p-2.5">المرجع</th>
+                              <th className="p-2.5 text-left">مدين (قيمة الفاتورة)</th>
+                              <th className="p-2.5 text-left">دائن (المسدد نقداً)</th>
+                              <th className="p-2.5">ملاحظات</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                          <tbody className="divide-y divide-slate-800/60">
                             {ledger.ledgerItems.map((item, idx) => (
-                              <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                <td className="p-2.5 font-mono">{item.date}</td>
-                                <td className="p-2.5 font-bold">{item.type}</td>
-                                <td className="p-2.5 font-mono font-bold text-amber-700">{item.ref}</td>
-                                <td className="p-2.5 font-mono font-bold text-slate-900 dark:text-white">{item.debit > 0 ? `${item.debit} EGP` : '-'}</td>
-                                <td className="p-2.5 font-mono font-bold text-emerald-600">{item.credit > 0 ? `${item.credit} EGP` : '-'}</td>
-                                <td className="p-2.5 text-slate-500">{item.notes}</td>
+                              <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
+                                <td className="p-2.5 font-mono tabular-nums text-slate-400 text-[11px]">{item.date}</td>
+                                <td className="p-2.5 font-medium text-slate-200">{item.type}</td>
+                                <td className="p-2.5 font-mono font-bold text-amber-400 text-[11px]">{item.ref}</td>
+                                <td className="p-2.5 text-left font-mono tabular-nums font-semibold text-slate-100">
+                                  {item.debit > 0 ? `${item.debit.toLocaleString()} ج.م` : '—'}
+                                </td>
+                                <td className="p-2.5 text-left font-mono tabular-nums font-semibold text-emerald-400">
+                                  {item.credit > 0 ? `${item.credit.toLocaleString()} ج.م` : '—'}
+                                </td>
+                                <td className="p-2.5 text-slate-400 text-[11px]">{item.notes}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
                     ) : (
-                      <p className="text-xs text-slate-400 p-4 text-center">لا يوجد حركات مسجلة بهذا الحساب حتى الآن.</p>
+                      <div className="p-6 text-center text-slate-500 border border-slate-800 rounded-lg bg-[#0b0f19]">
+                        لا توجد حركات مسجلة بهذا الحساب حتى الآن.
+                      </div>
                     )}
                   </div>
-                </>
+                </div>
               );
             })()}
           </div>

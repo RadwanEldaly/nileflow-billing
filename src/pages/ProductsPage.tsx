@@ -314,14 +314,15 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   }, [movements, detailsProduct]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-            <Trees className="w-6 h-6 text-amber-600" />
+          <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+            <Trees className="w-5 h-5 text-amber-400" />
             <span>{language === 'ar' ? 'كتالوج الألواح الخشبية' : 'Wooden Sheet Catalog'}</span>
           </h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-400 mt-0.5">
             {language === 'ar'
               ? 'إدارة ألواح الـ MDF، الكونتر، الأبلكاش، والزان - بحساب عدد الألواح وأسعار الشراء والبيع'
               : 'Manage MDF, Counter, Plywood, and hardwood sheet stock & prices.'}
@@ -330,19 +331,19 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={onNavigateToImport}
-            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-sm transition"
+            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-850 text-slate-200 border border-slate-700/80 font-medium text-xs px-3 py-2 rounded-md transition shadow-xs"
           >
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>{language === 'ar' ? 'استيراد إكسيل دفعة واحدة' : 'Import Excel'}</span>
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{language === 'ar' ? 'استيراد إكسيل' : 'Import Excel'}</span>
           </button>
           
           {/* Bulk Price Update Button */}
           {selectedProductIds.size > 0 && allSelectedSameWoodType && (
             <button
               onClick={() => setIsBulkPriceModalOpen(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-sm transition"
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-850 text-amber-300 border border-amber-500/40 font-medium text-xs px-3 py-2 rounded-md transition shadow-xs"
             >
-              <Banknote className="w-4 h-4" />
+              <Banknote className="w-3.5 h-3.5 text-amber-400" />
               <span>{language === 'ar' ? `تحديث أسعار (${selectedProductIds.size})` : `Update Prices (${selectedProductIds.size})`}</span>
             </button>
           )}
@@ -367,67 +368,67 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
               });
               setIsAddModalOpen(true);
             }}
-            className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-sm transition"
+            className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs px-3.5 py-2 rounded-md shadow-xs transition active:scale-[0.99]"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5" />
             <span>{language === 'ar' ? 'إضافة صنف لوح جديد' : 'Add Sheet Item'}</span>
           </button>
         </div>
       </div>
 
-      {/* PHASE 1 — Compact inventory summary row (always reflects the full catalog) */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-slate-200 dark:divide-slate-700 rtl:divide-x-reverse">
-        <div className="p-3.5 flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
+      {/* Compact Inventory Metrics Strip */}
+      <div className="bg-[#0e1424] rounded-lg border border-slate-800 grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-800 rtl:sm:divide-x-reverse overflow-hidden shadow-xs">
+        <div className="p-3.5 flex items-center gap-3">
+          <div className="p-2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
             <Boxes className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate">
+            <div className="text-[11px] text-slate-400 font-medium truncate">
               {language === 'ar' ? 'إجمالي الأصناف' : 'Total Items'}
             </div>
-            <div className="text-lg font-black text-slate-900 dark:text-white leading-tight">
+            <div className="text-lg font-bold font-mono text-slate-100 leading-tight tabular-nums">
               {catalogStats.totalItems.toLocaleString()}
             </div>
           </div>
         </div>
 
-        <div className="p-3.5 flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+        <div className="p-3.5 flex items-center gap-3">
+          <div className="p-2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
             <Layers className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate">
+            <div className="text-[11px] text-slate-400 font-medium truncate">
               {language === 'ar' ? 'إجمالي المخزون' : 'Total Stock'}
             </div>
-            <div className="text-lg font-black text-slate-900 dark:text-white leading-tight">
-              {catalogStats.totalStock.toLocaleString()} <span className="text-xs font-normal text-slate-500">{language === 'ar' ? 'لوح' : 'sheets'}</span>
+            <div className="text-lg font-bold font-mono text-slate-100 leading-tight tabular-nums">
+              {catalogStats.totalStock.toLocaleString()} <span className="text-xs font-normal text-slate-400">{language === 'ar' ? 'لوح' : 'sheets'}</span>
             </div>
           </div>
         </div>
 
-        <div className="p-3.5 flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+        <div className="p-3.5 flex items-center gap-3">
+          <div className="p-2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             <Wallet className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate">
+            <div className="text-[11px] text-slate-400 font-medium truncate">
               {language === 'ar' ? 'قيمة المخزون' : 'Stock Value'}
             </div>
-            <div className="text-lg font-black text-slate-900 dark:text-white leading-tight truncate">
-              {catalogStats.stockValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs font-normal text-slate-500">EGP</span>
+            <div className="text-lg font-bold font-mono text-slate-100 leading-tight tabular-nums">
+              {catalogStats.stockValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs font-normal text-slate-400">EGP</span>
             </div>
           </div>
         </div>
 
-        <div className="p-3.5 flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300">
+        <div className="p-3.5 flex items-center gap-3">
+          <div className="p-2 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
             <PackageX className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate">
+            <div className="text-[11px] text-slate-400 font-medium truncate">
               {language === 'ar' ? 'أصناف نفد مخزونها' : 'Out of Stock'}
             </div>
-            <div className={`text-lg font-black leading-tight ${catalogStats.outOfStock > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>
+            <div className={`text-lg font-bold font-mono leading-tight tabular-nums ${catalogStats.outOfStock > 0 ? 'text-rose-400' : 'text-slate-100'}`}>
               {catalogStats.outOfStock.toLocaleString()}
             </div>
           </div>
@@ -436,8 +437,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
 
       {/* Bulk selection warning if mixed wood types */}
       {selectedProductIds.size > 0 && !allSelectedSameWoodType && (
-        <div className="bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900 rounded-xl p-3 flex items-start gap-2">
-          <span className="text-xs text-orange-800 dark:text-orange-300 font-bold">
+        <div className="bg-amber-950/20 border border-amber-900/40 rounded-lg p-3 flex items-start gap-2">
+          <span className="text-xs text-amber-300 font-medium">
             {language === 'ar'
               ? '⚠️ لا يمكن تحديث الأسعار لأصناف من أنواع خشب مختلفة. يرجى اختيار أصناف من نفس النوع فقط.'
               : '⚠️ Cannot update prices for products with different wood types. Please select products of the same type only.'}
@@ -445,22 +446,23 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         </div>
       )}
 
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row gap-4">
+      {/* Search & Filter Controls */}
+      <div className="bg-[#0e1424] p-3 rounded-lg border border-slate-800 flex flex-col md:flex-row gap-2.5">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute top-3 right-3 text-slate-400 rtl:right-3 ltr:left-3" />
+          <Search className="w-3.5 h-3.5 absolute top-3 right-3 text-slate-500 rtl:right-3 ltr:left-3" />
           <input
             type="text"
             placeholder={language === 'ar' ? 'ابحث باسم اللوح، الكود، أو نوع الخشب (MDF، كونتر، أبلكاش)...' : 'Search sheet name, code, or wood type...'}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-10 rtl:pr-10 rtl:pl-4 ltr:pl-10 ltr:pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+            className="w-full pl-3 pr-9 rtl:pr-9 rtl:pl-3 ltr:pl-9 ltr:pr-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
           />
         </div>
         {woodTypes.length > 0 && (
           <select
             value={selectedWoodType}
             onChange={(e) => setSelectedWoodType(e.target.value)}
-            className="bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white px-4 py-2 font-bold focus:ring-2 focus:ring-amber-500"
+            className="bg-slate-950 border border-slate-700/80 rounded-md text-xs text-slate-200 px-3 py-1.5 font-medium focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
           >
             <option value="all">{language === 'ar' ? 'جميع أنواع الأخشاب' : 'All Wood Types'}</option>
             {woodTypes.map((w) => (
@@ -471,11 +473,11 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
           </select>
         )}
 
-        {/* PHASE 2 — stock status filter */}
+        {/* Stock status filter */}
         <select
           value={stockStatusFilter}
           onChange={(e) => setStockStatusFilter(e.target.value as StockStatusFilter)}
-          className="bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white px-4 py-2 font-bold focus:ring-2 focus:ring-amber-500"
+          className="bg-slate-950 border border-slate-700/80 rounded-md text-xs text-slate-200 px-3 py-1.5 font-medium focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
         >
           <option value="all">{language === 'ar' ? 'كل الأصناف' : 'All Statuses'}</option>
           <option value="available">{language === 'ar' ? 'متوفر' : 'In Stock'}</option>
@@ -484,10 +486,10 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         </select>
       </div>
 
-      {/* Selection safety notice: some selected products are hidden by the current filters */}
+      {/* Selection safety notice */}
       {hiddenSelectedCount > 0 && (
-        <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-xl p-3 flex items-start gap-2">
-          <span className="text-xs text-blue-800 dark:text-blue-300 font-bold">
+        <div className="bg-blue-950/20 border border-blue-900/40 rounded-lg p-2.5 flex items-start gap-2">
+          <span className="text-xs text-blue-300 font-medium">
             {language === 'ar'
               ? `ملحوظة: (${hiddenSelectedCount}) من الأصناف المحددة غير ظاهرة حالياً بسبب الفلاتر، وستظل ضمن التحديد وتتأثر بتحديث الأسعار.`
               : `Note: (${hiddenSelectedCount}) selected products are hidden by the current filters but remain selected and will be affected by a price update.`}
@@ -495,65 +497,66 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         </div>
       )}
 
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+      {/* Enterprise Catalog Table */}
+      <div className="bg-[#0e1424] rounded-lg border border-slate-800 overflow-hidden shadow-xs">
         {filteredProducts.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-right rtl:text-right ltr:text-left">
-              <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 text-xs uppercase border-b border-slate-200 dark:border-slate-700">
+            <table className="w-full text-xs text-right rtl:text-right ltr:text-left">
+              <thead className="bg-[#090d16] text-slate-400 text-[11px] uppercase border-b border-slate-800">
                 <tr>
-                  <th className="px-6 py-3.5">
+                  <th className="px-3.5 py-2.5 w-10 text-center">
                     <button
                       onClick={toggleSelectAll}
-                      className="flex items-center justify-center hover:text-amber-600 transition"
+                      className="flex items-center justify-center text-slate-500 hover:text-amber-400 transition"
                       title={language === 'ar' ? 'تحديد الكل' : 'Select All'}
                     >
                       {selectedProductIds.size === filteredProducts.length ? (
-                        <CheckSquare className="w-5 h-5" />
+                        <CheckSquare className="w-4 h-4 text-amber-400" />
                       ) : (
-                        <Square className="w-5 h-5" />
+                        <Square className="w-4 h-4" />
                       )}
                     </button>
                   </th>
-                  <th className="px-6 py-3.5">كود اللوح</th>
-                  <th className="px-6 py-3.5">اسم المنتج / اللوح</th>
-                  <th className="px-6 py-3.5">نوع الخشب</th>
-                  <th className="px-6 py-3.5">المقاس</th>
-                  <th className="px-6 py-3.5">اللون</th>
-                  <th className="px-6 py-3.5">تاريخ الإضافة</th>
-                  <th className="px-6 py-3.5">سعر البيع</th>
-                  <th className="px-6 py-3.5">رصيد الألواح الحالي</th>
-                  <th className="px-6 py-3.5 text-center">إجراءات</th>
+                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'كود اللوح' : 'Code'}</th>
+                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'اسم المنتج / اللوح' : 'Item Name'}</th>
+                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'نوع الخشب' : 'Wood Type'}</th>
+                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'المقاس' : 'Size'}</th>
+                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'اللون' : 'Color'}</th>
+                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'تاريخ الإضافة' : 'Date'}</th>
+                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'سعر البيع' : 'Selling Price'}</th>
+                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'رصيد الألواح' : 'Current Stock'}</th>
+                  <th className="px-3.5 py-2.5 text-center font-semibold">{language === 'ar' ? 'إجراءات' : 'Actions'}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+              <tbody className="divide-y divide-slate-800/60">
                 {filteredProducts.map((p) => {
                   const isLowStock = p.stock_quantity <= (p.min_stock_level || 10);
                   const isSelected = selectedProductIds.has(p.id);
                   const isMenuOpen = openMenuRowId === p.id;
                   return (
-                    <tr key={p.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 ${isSelected ? 'bg-amber-50 dark:bg-amber-950/20' : ''}`}>
-                      <td className="px-6 py-4">
+                    <tr key={p.id} className={`hover:bg-slate-850/50 transition ${isSelected ? 'bg-amber-500/5' : ''}`}>
+                      <td className="px-3.5 py-2.5 text-center">
                         <button
                           onClick={() => toggleSelectProduct(p.id)}
-                          className="flex items-center justify-center hover:text-amber-600 transition"
+                          className="flex items-center justify-center text-slate-500 hover:text-amber-400 transition"
                         >
                           {isSelected ? (
-                            <CheckSquare className="w-5 h-5 text-amber-600" />
+                            <CheckSquare className="w-4 h-4 text-amber-400" />
                           ) : (
-                            <Square className="w-5 h-5" />
+                            <Square className="w-4 h-4" />
                           )}
                         </button>
                       </td>
-                      <td className="px-6 py-4 font-mono font-bold text-xs text-slate-500">{p.code}</td>
-                      <td className="px-6 py-4 font-extrabold text-slate-900 dark:text-white">{p.name}</td>
-                      <td className="px-6 py-4">
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                      <td className="px-3.5 py-2.5 font-mono text-slate-400 font-medium">{p.code}</td>
+                      <td className="px-3.5 py-2.5 font-semibold text-slate-100">{p.name}</td>
+                      <td className="px-3.5 py-2.5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-200 border border-slate-700/80">
                           {p.wood_type}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-mono text-xs text-slate-600 dark:text-slate-300">{p.size || '—'}</td>
-                      <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-300">{p.color || '—'}</td>
-                      <td className="px-6 py-4 font-mono text-xs text-slate-500">
+                      <td className="px-3.5 py-2.5 font-mono text-slate-300">{p.size || '—'}</td>
+                      <td className="px-3.5 py-2.5 text-slate-300">{p.color || '—'}</td>
+                      <td className="px-3.5 py-2.5 font-mono text-slate-400 text-[11px]">
                         {p.created_at
                           ? new Date(p.created_at).toLocaleDateString('ar-EG', {
                               year: 'numeric',
@@ -562,30 +565,41 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                             })
                           : '—'}
                       </td>
-                      <td className="px-6 py-4 font-extrabold text-amber-700 dark:text-amber-400">{p.selling_price} EGP</td>
-                      <td className="px-6 py-4 font-black">
-                        <span className={`px-2.5 py-1 rounded-lg ${isLowStock ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300' : 'text-slate-900 dark:text-white'}`}>
+                      <td className="px-3.5 py-2.5 font-mono font-bold text-slate-100 tabular-nums">
+                        {p.selling_price} <span className="text-[10px] text-slate-400 font-normal">EGP</span>
+                      </td>
+                      <td className="px-3.5 py-2.5">
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-mono font-semibold tabular-nums ${
+                          p.stock_quantity === 0
+                            ? 'bg-rose-950/40 text-rose-300 border border-rose-900/60'
+                            : isLowStock
+                            ? 'bg-amber-950/40 text-amber-300 border border-amber-900/60'
+                            : 'text-slate-200'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            p.stock_quantity === 0 ? 'bg-rose-500' : isLowStock ? 'bg-amber-500' : 'bg-emerald-500'
+                          }`} />
                           {p.stock_quantity} لوح
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-3.5 py-2.5 text-center">
                         <div className="relative inline-block">
                           <button
                             onClick={() => setOpenMenuRowId(isMenuOpen ? null : p.id)}
                             title={language === 'ar' ? 'إجراءات' : 'Actions'}
-                            className="p-1.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition"
+                            className="p-1 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded border border-slate-800 transition"
                           >
-                            <MoreVertical className="w-4 h-4" />
+                            <MoreVertical className="w-3.5 h-3.5" />
                           </button>
 
                           {isMenuOpen && (
                             <>
                               {/* Backdrop to close on outside click */}
                               <div className="fixed inset-0 z-40" onClick={() => setOpenMenuRowId(null)} />
-                              <div className="absolute z-50 top-full mt-1 rtl:left-0 ltr:right-0 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg py-1.5 text-right rtl:text-right ltr:text-left">
+                              <div className="absolute z-50 top-full mt-1 rtl:left-0 ltr:right-0 w-44 bg-slate-900 border border-slate-700/80 rounded-md shadow-xl py-1 text-right rtl:text-right ltr:text-left">
                                 <button
                                   onClick={() => handleOpenDetails(p)}
-                                  className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 transition"
                                 >
                                   <Eye className="w-3.5 h-3.5 text-slate-400" />
                                   <span>{language === 'ar' ? 'عرض تفاصيل الصنف' : 'View Details'}</span>
@@ -595,25 +609,25 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                                     handleEditClick(p);
                                     setOpenMenuRowId(null);
                                   }}
-                                  className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 transition"
                                 >
                                   <Edit3 className="w-3.5 h-3.5 text-slate-400" />
                                   <span>{language === 'ar' ? 'تعديل الصنف' : 'Edit Item'}</span>
                                 </button>
                                 <button
                                   onClick={() => handleEditPriceClick(p)}
-                                  className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 transition"
                                 >
                                   <Banknote className="w-3.5 h-3.5 text-slate-400" />
                                   <span>{language === 'ar' ? 'تعديل السعر' : 'Edit Price'}</span>
                                 </button>
-                                <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
+                                <div className="my-1 border-t border-slate-800" />
                                 <button
                                   onClick={() => {
                                     setOpenMenuRowId(null);
                                     handleDeleteClick(p);
                                   }}
-                                  className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition"
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-rose-400 hover:bg-rose-950/30 transition"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                   <span>{language === 'ar' ? 'حذف الصنف' : 'Delete Item'}</span>
@@ -630,19 +644,19 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             </table>
           </div>
         ) : (
-          <div className="p-12 text-center text-slate-400">
-            <Trees className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-            <p className="font-bold text-slate-700 dark:text-slate-300">
+          <div className="p-10 text-center text-slate-400">
+            <Trees className="w-10 h-10 mx-auto text-slate-600 mb-2.5" />
+            <p className="font-semibold text-xs text-slate-300">
               {language === 'ar' ? 'لا يوجد أصناف أخشاب مسجلة حالياً' : 'No wooden sheets found'}
             </p>
-            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+            <p className="text-[11px] text-slate-500 mt-1 max-w-sm mx-auto">
               {language === 'ar'
                 ? 'قم باستيراد شيت إكسيل يحتوي على أصناف الأخشاب أو أضف صنف لوح جديد يدوياً.'
                 : 'Import Excel file containing wood items or add a new item manually.'}
             </p>
             <button
               onClick={onNavigateToImport}
-              className="mt-4 bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl hover:bg-emerald-600 transition"
+              className="mt-3 bg-slate-900 hover:bg-slate-850 text-slate-200 border border-slate-700/80 font-medium text-xs px-3.5 py-2 rounded-md transition"
             >
               استيراد أصناف الأخشاب من Excel
             </button>
@@ -650,20 +664,21 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         )}
       </div>
 
+      {/* Add / Edit Product Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-slate-700">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-lg max-w-md w-full p-5 shadow-2xl space-y-4 border border-slate-800">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-800">
+              <h3 className="text-sm font-bold text-slate-100">
                 {editingProduct ? 'تعديل بيانات صنف الخشب' : 'إضافة صنف لوح خشب جديد'}
               </h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
+              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-200">
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={handleSubmitNew} className="space-y-4">
+            <form onSubmit={handleSubmitNew} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-medium text-slate-300 mb-1">
                   اسم المنتج / اللوح الخشبي *
                 </label>
                 <input
@@ -672,12 +687,12 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   placeholder="مثال: لوح MDF أبيض إسباني 18 مم"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
+                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
                     كود الصنف (SKU)
                   </label>
                   <input
@@ -685,11 +700,11 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     placeholder="تلقائي إن ترك فارغاً"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-mono"
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-mono text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
                     نوع الخشب *
                   </label>
                   <input
@@ -698,13 +713,13 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     placeholder="MDF / كونتر / أبلكاش"
                     value={formData.wood_type}
                     onChange={(e) => setFormData({ ...formData, wood_type: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-bold"
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-medium text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
                     المقاس
                   </label>
                   <input
@@ -712,11 +727,11 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     placeholder="مثال: 08*22"
                     value={formData.size}
                     onChange={(e) => setFormData({ ...formData, size: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-mono font-bold"
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-mono text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
                     اللون / الدرجة
                   </label>
                   <input
@@ -724,24 +739,24 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     placeholder="مثال: BEYAZ MAT 1001"
                     value={formData.color}
                     onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-bold"
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-medium text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
                     تاريخ الإضافة
                   </label>
                   <input
                     type="text"
                     disabled
                     value="يُسجَّل تلقائياً عند الحفظ"
-                    className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-500 cursor-not-allowed"
+                    className="w-full px-3 py-1.5 bg-slate-950/50 border border-slate-800 rounded-md text-xs text-slate-500 cursor-not-allowed font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
                     سعر البيع (للّوح) *
                   </label>
                   <input
@@ -750,45 +765,45 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     required
                     value={formData.selling_price}
                     onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-extrabold text-amber-600"
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
                     {editingProduct ? 'عدد الألواح (قابل للتعديل)' : 'رصيد الألواح الأولي'}
                   </label>
                   <input
                     type="number"
                     value={formData.stock_quantity}
                     onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-bold"
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-mono text-slate-100 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
                     حد إعادة الطلب (ألواح)
                   </label>
                   <input
                     type="number"
                     value={formData.min_stock_level}
                     onChange={(e) => setFormData({ ...formData, min_stock_level: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-bold"
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-mono text-slate-100 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-3">
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-700"
+                  className="px-3.5 py-1.5 rounded-md text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white"
+                  className="px-3.5 py-1.5 rounded-md text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 transition active:scale-[0.99]"
                 >
                   حفظ صنف اللوح
                 </button>
@@ -803,69 +818,69 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         <BulkPriceUpdateModal
           woodType={selectedWoodTypeForBulk}
           selectedProducts={selectedProducts}
-          performedBy="admin" // TODO: Replace with actual user profile
+          performedBy="admin"
           language={language}
           onClose={() => setIsBulkPriceModalOpen(false)}
           onUpdated={handleBulkPriceUpdateSuccess}
         />
       )}
 
-      {/* PHASE 3 — Product details / movement history modal */}
+      {/* Product Details / Movement History Modal */}
       {detailsProduct && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-6 py-4 sticky top-0 bg-white dark:bg-slate-800 z-10">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Trees className="w-5 h-5 text-amber-600" />
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3.5 sticky top-0 bg-slate-900 z-10">
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <Trees className="w-4 h-4 text-amber-400" />
                 <span>{detailsProduct.name}</span>
               </h3>
-              <button onClick={() => setDetailsProduct(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
+              <button onClick={() => setDetailsProduct(null)} className="text-slate-400 hover:text-slate-200">
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              {/* Product details */}
+            <div className="p-5 space-y-5">
+              {/* Product Details Grid */}
               <div>
-                <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
+                <h4 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5">
                   {language === 'ar' ? 'بيانات الصنف' : 'Product Details'}
                 </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-950 p-3.5 rounded-md border border-slate-800">
                   <div>
-                    <div className="text-[11px] text-slate-500">{language === 'ar' ? 'اسم المنتج' : 'Name'}</div>
-                    <div className="text-sm font-bold text-slate-900 dark:text-white">{detailsProduct.name}</div>
+                    <div className="text-[10px] text-slate-400">{language === 'ar' ? 'اسم المنتج' : 'Name'}</div>
+                    <div className="text-xs font-semibold text-slate-100 mt-0.5">{detailsProduct.name}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-slate-500">{language === 'ar' ? 'كود اللوح' : 'Code'}</div>
-                    <div className="text-sm font-mono font-bold text-slate-900 dark:text-white">{detailsProduct.code}</div>
+                    <div className="text-[10px] text-slate-400">{language === 'ar' ? 'كود اللوح' : 'Code'}</div>
+                    <div className="text-xs font-mono font-medium text-slate-200 mt-0.5">{detailsProduct.code}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-slate-500">{language === 'ar' ? 'نوع الخشب' : 'Wood Type'}</div>
-                    <div className="text-sm font-bold text-slate-900 dark:text-white">{detailsProduct.wood_type}</div>
+                    <div className="text-[10px] text-slate-400">{language === 'ar' ? 'نوع الخشب' : 'Wood Type'}</div>
+                    <div className="text-xs font-medium text-slate-200 mt-0.5">{detailsProduct.wood_type}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-slate-500">{language === 'ar' ? 'المقاس' : 'Size'}</div>
-                    <div className="text-sm font-bold text-slate-900 dark:text-white">{detailsProduct.size || '—'}</div>
+                    <div className="text-[10px] text-slate-400">{language === 'ar' ? 'المقاس' : 'Size'}</div>
+                    <div className="text-xs font-mono text-slate-200 mt-0.5">{detailsProduct.size || '—'}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-slate-500">{language === 'ar' ? 'اللون' : 'Color'}</div>
-                    <div className="text-sm font-bold text-slate-900 dark:text-white">{detailsProduct.color || '—'}</div>
+                    <div className="text-[10px] text-slate-400">{language === 'ar' ? 'اللون' : 'Color'}</div>
+                    <div className="text-xs text-slate-200 mt-0.5">{detailsProduct.color || '—'}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-slate-500">{language === 'ar' ? 'سعر البيع' : 'Selling Price'}</div>
-                    <div className="text-sm font-extrabold text-amber-600">{detailsProduct.selling_price} EGP</div>
+                    <div className="text-[10px] text-slate-400">{language === 'ar' ? 'سعر البيع' : 'Selling Price'}</div>
+                    <div className="text-xs font-mono font-bold text-amber-400 mt-0.5">{detailsProduct.selling_price} EGP</div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-slate-500">{language === 'ar' ? 'سعر الشراء' : 'Purchase Price'}</div>
-                    <div className="text-sm font-bold text-slate-900 dark:text-white">{detailsProduct.purchase_price ?? '—'} EGP</div>
+                    <div className="text-[10px] text-slate-400">{language === 'ar' ? 'سعر الشراء' : 'Purchase Price'}</div>
+                    <div className="text-xs font-mono text-slate-300 mt-0.5">{detailsProduct.purchase_price ?? '—'} EGP</div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-slate-500">{language === 'ar' ? 'الرصيد الحالي' : 'Current Stock'}</div>
-                    <div className="text-sm font-black text-slate-900 dark:text-white">{detailsProduct.stock_quantity} {language === 'ar' ? 'لوح' : ''}</div>
+                    <div className="text-[10px] text-slate-400">{language === 'ar' ? 'الرصيد الحالي' : 'Current Stock'}</div>
+                    <div className="text-xs font-mono font-bold text-slate-100 mt-0.5">{detailsProduct.stock_quantity} {language === 'ar' ? 'لوح' : ''}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-slate-500">{language === 'ar' ? 'تاريخ الإضافة' : 'Added On'}</div>
-                    <div className="text-sm font-bold text-slate-900 dark:text-white">
+                    <div className="text-[10px] text-slate-400">{language === 'ar' ? 'تاريخ الإضافة' : 'Added On'}</div>
+                    <div className="text-xs font-mono text-slate-300 mt-0.5">
                       {detailsProduct.created_at
                         ? new Date(detailsProduct.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' })
                         : '—'}
@@ -876,42 +891,42 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
 
               {/* Movement history */}
               <div>
-                <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <h4 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                   <History className="w-3.5 h-3.5" />
-                  <span>{language === 'ar' ? 'حركة الصنف' : 'Stock Movement'}</span>
+                  <span>{language === 'ar' ? 'حركة الصنف بالمخازن' : 'Stock Movement'}</span>
                 </h4>
 
                 {productMovements.length > 0 ? (
-                  <div className="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-xl">
+                  <div className="overflow-x-auto border border-slate-800 rounded-md">
                     <table className="w-full text-xs text-right rtl:text-right ltr:text-left">
-                      <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 uppercase">
+                      <thead className="bg-[#090d16] text-slate-400 uppercase text-[10px] border-b border-slate-800">
                         <tr>
-                          <th className="px-4 py-2.5">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
-                          <th className="px-4 py-2.5">{language === 'ar' ? 'نوع الحركة' : 'Type'}</th>
-                          <th className="px-4 py-2.5">{language === 'ar' ? 'الكمية' : 'Qty'}</th>
-                          <th className="px-4 py-2.5">{language === 'ar' ? 'الرصيد بعد الحركة' : 'Balance After'}</th>
-                          <th className="px-4 py-2.5">{language === 'ar' ? 'المرجع' : 'Reference'}</th>
+                          <th className="px-3 py-2">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                          <th className="px-3 py-2">{language === 'ar' ? 'نوع الحركة' : 'Type'}</th>
+                          <th className="px-3 py-2">{language === 'ar' ? 'الكمية' : 'Qty'}</th>
+                          <th className="px-3 py-2">{language === 'ar' ? 'الرصيد بعد الحركة' : 'Balance After'}</th>
+                          <th className="px-3 py-2">{language === 'ar' ? 'المرجع' : 'Reference'}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                      <tbody className="divide-y divide-slate-800/60">
                         {productMovements.map(({ movement: m, balanceAfter }) => {
                           const isPositive = m.quantity > 0;
                           return (
-                            <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                              <td className="px-4 py-2.5 font-mono text-slate-500 whitespace-nowrap">
+                            <tr key={m.id} className="hover:bg-slate-850/50">
+                              <td className="px-3 py-2 font-mono text-slate-400 whitespace-nowrap">
                                 <span className="inline-flex items-center gap-1">
-                                  <Clock className="w-3 h-3 text-slate-400" />
+                                  <Clock className="w-3 h-3 text-slate-500" />
                                   {new Date(m.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' })}
                                 </span>
                               </td>
-                              <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">
+                              <td className="px-3 py-2 text-slate-300">
                                 {language === 'ar' ? MOVEMENT_TYPE_LABELS_AR[m.movement_type] : m.movement_type}
                               </td>
-                              <td className={`px-4 py-2.5 font-bold font-mono ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+                              <td className={`px-3 py-2 font-bold font-mono tabular-nums ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
                                 {isPositive ? `+${m.quantity}` : m.quantity}
                               </td>
-                              <td className="px-4 py-2.5 font-bold text-slate-900 dark:text-white">{balanceAfter}</td>
-                              <td className="px-4 py-2.5 text-slate-500">{m.reference_id || '—'}</td>
+                              <td className="px-3 py-2 font-bold font-mono text-slate-100 tabular-nums">{balanceAfter}</td>
+                              <td className="px-3 py-2 font-mono text-slate-400">{m.reference_id || '—'}</td>
                             </tr>
                           );
                         })}
@@ -919,7 +934,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     </table>
                   </div>
                 ) : (
-                  <div className="p-6 text-center text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold">
+                  <div className="p-5 text-center text-slate-400 border border-dashed border-slate-800 rounded-md text-xs">
                     {language === 'ar' ? 'لا توجد حركة مسجلة لهذا الصنف' : 'No movement recorded for this item'}
                   </div>
                 )}

@@ -29,6 +29,22 @@ export function App() {
   const [language, setLanguage] = useState<'ar' | 'en'>('ar');
   const [currentUser, setCurrentUser] = useState({ name: 'إدارة شركة الدالي (Admin)', role: 'admin' as const });
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('nileflow_sidebar_open');
+      if (saved !== null) return saved === 'true';
+      return window.innerWidth >= 1024;
+    }
+    return true;
+  });
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen((prev) => {
+      const next = !prev;
+      localStorage.setItem('nileflow_sidebar_open', String(next));
+      return next;
+    });
+  };
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -551,153 +567,190 @@ export function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-[#0b0f19] flex flex-col items-center justify-center gap-3">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-slate-800 border-t-amber-500"></div>
+        <span className="text-xs text-slate-400 font-mono tracking-wider">جاري تحميل بيانات النظام...</span>
       </div>
     );
   }
 
+  const tabTitles: Record<NavTab, { ar: string; en: string }> = {
+    dashboard: { ar: 'لوحة المتابعة والمؤشرات', en: 'Dashboard & Metrics' },
+    products: { ar: 'كتالوج الألواح الخشبية', en: 'Wood Sheets Catalog' },
+    warehouses: { ar: 'المخازن وحركة الألواح', en: 'Warehouses & Stock' },
+    sales: { ar: 'فواتير مبيعات الأخشاب', en: 'Wood Sales Invoices' },
+    purchases: { ar: 'فواتير مشتريات وتوريد الأخشاب', en: 'Wood Purchase Invoices' },
+    customers: { ar: 'سجل العملاء وكشوف الحساب', en: 'Customers Ledger' },
+    suppliers: { ar: 'سجل الموردين والمصانع', en: 'Suppliers Ledger' },
+    payments: { ar: 'المدفوعات والتحصيلات', en: 'Payments & Collections' },
+    import: { ar: 'استيراد شيتات إكسيل', en: 'Excel Batch Import' },
+    reports: { ar: 'التقارير التحليلية والمالية الشاملة', en: 'Executive Reports' },
+  };
+
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans antialiased">
-      {/* Header */}
-      <Header
+    <div
+      className="min-h-screen bg-transparent text-slate-100 flex selection:bg-amber-500/30 selection:text-amber-200"
+      dir={language === 'ar' ? 'rtl' : 'ltr'}
+    >
+      {/* Sidebar Navigation (القائمة الجانبية) */}
+      <Navigation
+        activeTab={activeTab}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+            setIsSidebarOpen(false);
+          }
+        }}
         language={language}
-        onLanguageChange={setLanguage}
-        currentUser={currentUser as any}
-        onUserChange={setCurrentUser as any}
-        onLogout={handleLogout}
+        isOpen={isSidebarOpen}
+        onClose={() => {
+          setIsSidebarOpen(false);
+          localStorage.setItem('nileflow_sidebar_open', 'false');
+        }}
       />
 
-      {/* Navigation */}
-      <Navigation activeTab={activeTab} onTabChange={setActiveTab} language={language} />
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
+        {/* Top Header */}
+        <Header
+          language={language}
+          onLanguageChange={setLanguage}
+          currentUser={currentUser as any}
+          onUserChange={setCurrentUser as any}
+          onLogout={handleLogout}
+          activeTabTitle={language === 'ar' ? tabTitles[activeTab]?.ar : tabTitles[activeTab]?.en}
+          isSidebarOpen={isSidebarOpen}
+          onToggleSidebar={toggleSidebar}
+        />
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'dashboard' && (
-          <DashboardPage
-            products={products}
-            customers={customers}
-            suppliers={suppliers}
-            salesInvoices={salesInvoices}
-            purchaseInvoices={purchaseInvoices}
-            stockMovements={stockMovements}
-            language={language}
-            onNavigate={setActiveTab}
-            onOpenNewSale={() => {
-              setIsSalesModalOpenInitially(true);
-              setActiveTab('sales');
-            }}
-            onOpenNewPurchase={() => {
-              setIsPurchaseModalOpenInitially(true);
-              setActiveTab('purchases');
-            }}
-          />
-        )}
+        {/* Page Content */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-7 max-w-[1600px] w-full mx-auto">
+          {activeTab === 'dashboard' && (
+            <DashboardPage
+              products={products}
+              customers={customers}
+              suppliers={suppliers}
+              salesInvoices={salesInvoices}
+              purchaseInvoices={purchaseInvoices}
+              stockMovements={stockMovements}
+              language={language}
+              onNavigate={setActiveTab}
+              onOpenNewSale={() => {
+                setIsSalesModalOpenInitially(true);
+                setActiveTab('sales');
+              }}
+              onOpenNewPurchase={() => {
+                setIsPurchaseModalOpenInitially(true);
+                setActiveTab('purchases');
+              }}
+            />
+          )}
 
-        {activeTab === 'products' && (
-          <ProductsPage
-            products={products}
-            suppliers={suppliers}
-            movements={stockMovements}
-            language={language}
-            onAddProduct={handleAddProduct}
-            onUpdateProduct={handleUpdateProduct}
-            onDeleteProduct={handleDeleteProduct}
-            onNavigateToImport={() => setActiveTab('import')}
-          />
-        )}
+          {activeTab === 'products' && (
+            <ProductsPage
+              products={products}
+              suppliers={suppliers}
+              movements={stockMovements}
+              language={language}
+              onAddProduct={handleAddProduct}
+              onUpdateProduct={handleUpdateProduct}
+              onDeleteProduct={handleDeleteProduct}
+              onNavigateToImport={() => setActiveTab('import')}
+            />
+          )}
 
-        {activeTab === 'warehouses' && (
-          <WarehousesPage
-            warehouses={warehouses}
-            products={products}
-            movements={stockMovements}
-            language={language}
-            onAddMovement={handleAddStockMovement}
-          />
-        )}
+          {activeTab === 'warehouses' && (
+            <WarehousesPage
+              warehouses={warehouses}
+              products={products}
+              movements={stockMovements}
+              language={language}
+              onAddMovement={handleAddStockMovement}
+            />
+          )}
 
-        {activeTab === 'sales' && (
-          <SalesPage
-            salesInvoices={salesInvoices}
-            customers={customers}
-            products={products}
-            warehouses={warehouses}
-            language={language}
-            onCreateInvoice={handleCreateSalesInvoice}
-            onUpdateInvoice={handleUpdateSalesInvoice}
-            onDeleteInvoice={handleDeleteSalesInvoice}
-            isCreateOpenInitially={isSalesModalOpenInitially}
-          />
-        )}
+          {activeTab === 'sales' && (
+            <SalesPage
+              salesInvoices={salesInvoices}
+              customers={customers}
+              products={products}
+              warehouses={warehouses}
+              language={language}
+              onCreateInvoice={handleCreateSalesInvoice}
+              onUpdateInvoice={handleUpdateSalesInvoice}
+              onDeleteInvoice={handleDeleteSalesInvoice}
+              isCreateOpenInitially={isSalesModalOpenInitially}
+            />
+          )}
 
-        {activeTab === 'purchases' && (
-          <PurchasesPage
-            purchaseInvoices={purchaseInvoices}
-            suppliers={suppliers}
-            products={products}
-            warehouses={warehouses}
-            language={language}
-            onCreatePurchase={handleCreatePurchaseInvoice}
-            onDeleteInvoice={handleDeletePurchaseInvoice}
-          />
-        )}
+          {activeTab === 'purchases' && (
+            <PurchasesPage
+              purchaseInvoices={purchaseInvoices}
+              suppliers={suppliers}
+              products={products}
+              warehouses={warehouses}
+              language={language}
+              onCreatePurchase={handleCreatePurchaseInvoice}
+              onDeleteInvoice={handleDeletePurchaseInvoice}
+            />
+          )}
 
-        {activeTab === 'customers' && (
-          <CustomersPage
-            customers={customers}
-            salesInvoices={salesInvoices}
-            transactions={transactions}
-            language={language}
-            onAddCustomer={handleAddCustomer}
-            onUpdateCustomer={handleUpdateCustomer}
-            onDeleteCustomer={handleDeleteCustomer}
-          />
-        )}
+          {activeTab === 'customers' && (
+            <CustomersPage
+              customers={customers}
+              salesInvoices={salesInvoices}
+              transactions={transactions}
+              language={language}
+              onAddCustomer={handleAddCustomer}
+              onUpdateCustomer={handleUpdateCustomer}
+              onDeleteCustomer={handleDeleteCustomer}
+            />
+          )}
 
-        {activeTab === 'suppliers' && (
-          <SuppliersPage
-            suppliers={suppliers}
-            purchaseInvoices={purchaseInvoices}
-            transactions={transactions}
-            language={language}
-            onAddSupplier={handleAddSupplier}
-            onUpdateSupplier={handleUpdateSupplier}
-            onDeleteSupplier={handleDeleteSupplier}
-          />
-        )}
+          {activeTab === 'suppliers' && (
+            <SuppliersPage
+              suppliers={suppliers}
+              purchaseInvoices={purchaseInvoices}
+              transactions={transactions}
+              language={language}
+              onAddSupplier={handleAddSupplier}
+              onUpdateSupplier={handleUpdateSupplier}
+              onDeleteSupplier={handleDeleteSupplier}
+            />
+          )}
 
-        {activeTab === 'payments' && (
-          <PaymentsPage
-            transactions={transactions}
-            customers={customers}
-            suppliers={suppliers}
-            language={language}
-            onAddTransaction={handleAddTransaction}
-          />
-        )}
+          {activeTab === 'payments' && (
+            <PaymentsPage
+              transactions={transactions}
+              customers={customers}
+              suppliers={suppliers}
+              language={language}
+              onAddTransaction={handleAddTransaction}
+            />
+          )}
 
-        {activeTab === 'import' && (
-          <ImportPage
-            existingCustomers={customers}
-            existingProducts={products}
-            language={language}
-            onCommitCustomersImport={handleCommitCustomersImport}
-            onCommitProductsImport={handleCommitProductsImport}
-          />
-        )}
+          {activeTab === 'import' && (
+            <ImportPage
+              existingCustomers={customers}
+              existingProducts={products}
+              language={language}
+              onCommitCustomersImport={handleCommitCustomersImport}
+              onCommitProductsImport={handleCommitProductsImport}
+            />
+          )}
 
-        {activeTab === 'reports' && (
-          <ReportsPage
-            products={products}
-            customers={customers}
-            suppliers={suppliers}
-            salesInvoices={salesInvoices}
-            purchaseInvoices={purchaseInvoices}
-            language={language}
-          />
-        )}
-      </main>
+          {activeTab === 'reports' && (
+            <ReportsPage
+              products={products}
+              customers={customers}
+              suppliers={suppliers}
+              salesInvoices={salesInvoices}
+              purchaseInvoices={purchaseInvoices}
+              language={language}
+            />
+          )}
+        </main>
+      </div>
     </div>
   );
 }

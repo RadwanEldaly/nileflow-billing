@@ -1,16 +1,158 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Tajawal:wght@400;500;700;800;900&display=swap');
 @import "tailwindcss";
 
+@theme {
+  --font-sans: 'Cairo', 'Tajawal', 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
 @layer base {
+  * {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
   body {
-    @apply bg-slate-100 text-slate-900 font-sans antialiased;
+    background-color: #001c54;
+    background-image: 
+      radial-gradient(ellipse 90% 55% at 50% -10%, rgba(30, 41, 59, 0.55), transparent 70%),
+      radial-gradient(ellipse 65% 45% at 90% 12%, rgba(217, 119, 6, 0.08), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 10% 85%, rgba(15, 23, 42, 0.6), transparent 75%);
+    background-attachment: fixed;
+    color: #ffffff;
+    font-family: 'Cairo', 'Tajawal', 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
+  }
+
+  /* Bold, punchy headings and titles */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Cairo', 'Tajawal', 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif;
+    font-weight: 800;
+    color: #ffffff;
+  }
+
+  /* Clear high-contrast labels and badges */
+  label {
+    font-family: 'Cairo', 'Tajawal', 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif;
+    font-weight: 700;
+    color: #f8fafc;
+  }
+
+  /* Clear crisp buttons */
+  button {
+    font-family: 'Cairo', 'Tajawal', 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif;
+    font-weight: 700;
+  }
+
+  /* Sharp table text */
+  table th {
+    font-family: 'Cairo', 'Tajawal', 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif;
+    font-weight: 800;
+    color: #f8fafc;
+  }
+
+  table td {
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  /* High contrast readable form controls */
+  input, select, textarea {
+    font-family: 'Cairo', 'Tajawal', 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif;
+    color: #ffffff;
+    font-weight: 600;
+  }
+
+  /* Boost washed-out gray classes to bright, sharp, legible tones */
+  .text-slate-400, .text-gray-400 {
+    color: #cbd5e1;
+    font-weight: 600;
+  }
+
+  .text-slate-500, .text-gray-500 {
+    color: #94a3b8;
+    font-weight: 600;
+  }
+
+  .text-slate-300, .text-gray-300 {
+    color: #f1f5f9;
+    font-weight: 600;
+  }
+
+  /* Precise number rendering across business documents */
+  .tabular-nums, .font-mono, td, input[type="number"] {
+    font-feature-settings: "tnum" 1;
+    font-variant-numeric: tabular-nums;
   }
 }
 
-/* Custom scrollbar */
+/* Custom Sleek Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #080c14;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Print optimizations for commercial business documents & invoices */
+@media print {
+  body {
+    background-color: #ffffff !important;
+    background-image: none !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+  }
+
+  header, nav, button, .no-print, [role="button"] {
+    display: none !important;
+  }
+
+  * {
+    color: #000000 !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+
+  .invoice-print-sheet {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  th, td {
+    border: 1px solid #111111 !important;
+    color: #000000 !important;
+  }
+
+  .border-b, .border-t, .border {
+    border-color: #222222 !important;
+  }
 }
