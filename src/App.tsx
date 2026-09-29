@@ -225,24 +225,54 @@ export function App() {
   };
 
   const handleCreateSalesInvoice = async (invoiceData: Omit<SalesInvoice, 'id' | 'created_at'>) => {
-    const { items, ...invoiceRecord } = invoiceData;
+    const { items, ...rawRecord } = invoiceData;
     
+    // Explicitly sanitize and map only valid columns for sales_invoices table in Supabase
+    const invoiceRecord = {
+      invoice_number: rawRecord.invoice_number,
+      customer_id: rawRecord.customer_id,
+      warehouse_id: rawRecord.warehouse_id || warehouses[0]?.id,
+      invoice_date: rawRecord.invoice_date,
+      status: rawRecord.status || 'approved',
+      subtotal: rawRecord.subtotal || 0,
+      discount: rawRecord.discount || 0,
+      total: rawRecord.total || 0,
+      paid_amount: rawRecord.paid_amount || 0,
+      remaining_balance: rawRecord.remaining_balance || 0,
+      notes: rawRecord.notes || '',
+    };
+
     // Insert invoice
     const { data: invData, error: invError } = await supabase.from('sales_invoices').insert([invoiceRecord]).select();
+    if (invError) {
+      console.error('Error creating sales invoice:', invError);
+      alert('خطأ أثناء حفظ فاتورة المبيعات: ' + (invError.message || JSON.stringify(invError)));
+      return;
+    }
+
     if (invData && invData[0]) {
       const newInvoice = invData[0];
       
       // Insert items
       if (items && items.length > 0) {
         const itemsToInsert = items.map(item => ({
-          ...item,
-          invoice_id: newInvoice.id
+          invoice_id: newInvoice.id,
+          product_id: item.product_id || null,
+          product_name_snapshot: item.product_name_snapshot || 'لوح خشب',
+          wood_type_snapshot: item.wood_type_snapshot || 'ألواح',
+          quantity_sheets: item.quantity_sheets || 1,
+          unit_price: item.unit_price || 0,
+          line_total: item.line_total || 0,
         }));
-        await supabase.from('sales_invoice_items').insert(itemsToInsert);
-        newInvoice.items = itemsToInsert;
+        const { error: itemsError } = await supabase.from('sales_invoice_items').insert(itemsToInsert);
+        if (itemsError) {
+          console.error('Error inserting sales invoice items:', itemsError);
+          alert('خطأ في حفظ بنود الفاتورة: ' + itemsError.message);
+        }
+        newInvoice.items = itemsToInsert as any;
       }
 
-      setSalesInvoices([newInvoice, ...salesInvoices]);
+      setSalesInvoices((prev) => [newInvoice, ...prev]);
 
       // Deduct stock
       if (items) {
@@ -267,11 +297,9 @@ export function App() {
         const updatedBalance = (cust.balance || 0) + newInvoice.remaining_balance;
         const { data: updatedCust } = await supabase.from('customers').update({ balance: updatedBalance }).eq('id', cust.id).select();
         if (updatedCust && updatedCust[0]) {
-          setCustomers(customers.map((c) => (c.id === cust.id ? updatedCust[0] : c)));
+          setCustomers((prev) => prev.map((c) => (c.id === cust.id ? updatedCust[0] : c)));
         }
       }
-    } else {
-      console.error('Error creating sales invoice:', invError);
     }
   };
 
@@ -282,7 +310,20 @@ export function App() {
     const oldInvoice = salesInvoices.find((i) => i.id === invoiceId);
     if (!oldInvoice) return;
 
-    const { items: newItems, ...invoiceRecord } = invoiceData;
+    const { items: newItems, ...rawRecord } = invoiceData;
+    const invoiceRecord = {
+      invoice_number: rawRecord.invoice_number,
+      customer_id: rawRecord.customer_id,
+      warehouse_id: rawRecord.warehouse_id || oldInvoice.warehouse_id,
+      invoice_date: rawRecord.invoice_date,
+      status: rawRecord.status || 'approved',
+      subtotal: rawRecord.subtotal || 0,
+      discount: rawRecord.discount || 0,
+      total: rawRecord.total || 0,
+      paid_amount: rawRecord.paid_amount || 0,
+      remaining_balance: rawRecord.remaining_balance || 0,
+      notes: rawRecord.notes || '',
+    };
 
     // 1) Reverse the OLD invoice's stock effect (same pattern as handleDeleteSalesInvoice)
     if (oldInvoice.items) {
@@ -322,7 +363,7 @@ export function App() {
 
     if (!updatedInvData || !updatedInvData[0]) {
       console.error('Error updating sales invoice:', updateError);
-      alert(language === 'ar' ? 'فشل تحديث الفاتورة، برجاء المحاولة مرة أخرى' : 'Failed to update invoice, please try again');
+      alert(language === 'ar' ? 'فشل تحديث الفاتورة: ' + (updateError?.message || '') : 'Failed to update invoice: ' + (updateError?.message || ''));
       return;
     }
 
@@ -330,7 +371,15 @@ export function App() {
     await supabase.from('sales_invoice_items').delete().eq('invoice_id', invoiceId);
     let insertedItems: SalesInvoiceItem[] = [];
     if (newItems && newItems.length > 0) {
-      const itemsToInsert = newItems.map((item) => ({ ...item, invoice_id: invoiceId }));
+      const itemsToInsert = newItems.map((item) => ({
+        invoice_id: invoiceId,
+        product_id: item.product_id || null,
+        product_name_snapshot: item.product_name_snapshot || 'لوح خشب',
+        wood_type_snapshot: item.wood_type_snapshot || 'ألواح',
+        quantity_sheets: item.quantity_sheets || 1,
+        unit_price: item.unit_price || 0,
+        line_total: item.line_total || 0,
+      }));
       const { data: insertedData } = await supabase.from('sales_invoice_items').insert(itemsToInsert).select();
       if (insertedData) insertedItems = insertedData;
     }

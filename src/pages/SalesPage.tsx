@@ -46,6 +46,12 @@ export const SalesPage: React.FC<SalesPageProps> = ({
   // Fast product search input for invoice creation
   const [productQuery, setProductQuery] = useState('');
 
+  React.useEffect(() => {
+    if (!warehouseId && warehouses.length > 0) {
+      setWarehouseId(warehouses[0].id);
+    }
+  }, [warehouses, warehouseId]);
+
   const handleAddLineItem = () => {
     if (products.length === 0) return;
     const firstProd = products[0];
@@ -143,14 +149,19 @@ export const SalesPage: React.FC<SalesPageProps> = ({
       };
     });
 
+    const finalWarehouseId = warehouseId || warehouses[0]?.id;
+    if (!finalWarehouseId) {
+      alert('برجاء اختيار المخزن');
+      return;
+    }
+
     if (editingInvoiceId) {
       onUpdateInvoice(editingInvoiceId, {
         invoice_number: salesInvoices.find(i => i.id === editingInvoiceId)?.invoice_number || formattedNum,
         customer_id: customerId,
-        warehouse_id: warehouseId,
+        warehouse_id: finalWarehouseId,
         invoice_date: invoiceDate,
         status: 'approved',
-        payment_method: 'cash',
         subtotal,
         discount: discountVal,
         total: grandTotal,
@@ -163,10 +174,9 @@ export const SalesPage: React.FC<SalesPageProps> = ({
       onCreateInvoice({
         invoice_number: formattedNum,
         customer_id: customerId,
-        warehouse_id: warehouseId,
+        warehouse_id: finalWarehouseId,
         invoice_date: invoiceDate,
         status: 'approved',
-        payment_method: 'cash',
         subtotal,
         discount: discountVal,
         total: grandTotal,
@@ -810,15 +820,12 @@ export const SalesPage: React.FC<SalesPageProps> = ({
               </div>
 
               {/* Printable Invoice Document */}
-              <div className="invoice-print-sheet text-slate-900 text-xs">
+              <div className="invoice-print-sheet text-slate-900 text-xs bg-white border border-slate-400 p-4 rounded-lg shadow-sm">
                 {/* Company Header */}
-                <div className="flex items-center justify-between border-b border-slate-300 pb-3 mb-2">
+                <div className="flex items-center justify-between border-b border-slate-400 pb-2 mb-2">
                   <div className="text-right">
                     <h2 className="text-xl font-black text-slate-950">شركة الدالي لتجارة الأخشاب والقشرة</h2>
-                    <p className="text-[11px] text-slate-600 mt-0.5">
-                      متخصصون في توريد كافة أنواع الألواح الخشبية (MDF - كونتر - أبلكاش - قشرة)
-                    </p>
-                    <p className="text-[10px] text-slate-600 font-mono mt-0.5">
+                    <p className="text-[11px] text-slate-700 font-mono mt-0.5">
                       العنوان: البدرشين - طريق أبوربع | ت: 01001911745 - 01119596070
                     </p>
                   </div>
@@ -829,120 +836,131 @@ export const SalesPage: React.FC<SalesPageProps> = ({
                   />
                 </div>
 
-                <div className="text-center border-y border-slate-800 py-1 my-2">
+                <div className="text-center border-y border-slate-800 py-1 my-2 bg-slate-100">
                   <h1 className="text-sm font-black tracking-wide text-slate-900">بيان فاتورة بيع أخشاب</h1>
                 </div>
 
-                {/* Metadata & Customer Box */}
-                <div className="flex flex-wrap justify-between gap-3 mb-3">
-                  <div className="border border-slate-300 rounded overflow-hidden text-[11px] w-48">
-                    <div className="flex justify-between px-2 py-1 border-b border-slate-200 bg-slate-100">
-                      <span className="font-bold text-slate-700">رقم الفاتورة:</span>
-                      <span className="font-mono font-bold">{selectedInvoiceForView.invoice_number}</span>
+                {/* Metadata & Customer Box - Customer on RIGHT, Invoice No on LEFT */}
+                <div className="flex justify-between items-start gap-3 mb-2.5">
+                  {/* Right: Customer Info Box */}
+                  <div className="border border-slate-700 rounded text-xs p-2 bg-slate-50 text-right min-w-[240px] max-w-sm">
+                    <div className="font-black text-slate-900 border-b border-slate-300 pb-1 mb-1">
+                      بيانات العميل:
                     </div>
-                    <div className="flex justify-between px-2 py-1">
-                      <span className="font-bold text-slate-700">تاريخ الفاتورة:</span>
-                      <span className="font-mono">{selectedInvoiceForView.invoice_date}</span>
+                    <div className="space-y-0.5">
+                      <div><span className="font-bold text-slate-700">الاسم: </span><span className="font-black text-slate-950">{cust?.name || 'عميل نقدي'}</span></div>
+                      {cust?.code && <div><span className="font-bold text-slate-700">الكود: </span><span className="font-mono font-bold text-slate-900">{cust.code}</span></div>}
+                      {cust?.mobile && <div><span className="font-bold text-slate-700">التليفون: </span><span className="font-mono text-slate-900">{cust.mobile}</span></div>}
+                      {cust?.address && <div><span className="font-bold text-slate-700">العنوان: </span><span className="text-slate-900">{cust.address}</span></div>}
                     </div>
                   </div>
 
-                  <div className="text-[11px] space-y-0.5 text-right flex-1 max-w-xs border border-slate-300 rounded p-2 bg-slate-50">
-                    <div><span className="font-bold text-slate-700">اسم العميل:</span> {cust?.name || 'عميل نقدي'}</div>
-                    {cust?.code && <div><span className="font-bold text-slate-700">كود العميل:</span> {cust.code}</div>}
-                    {cust?.mobile && <div><span className="font-bold text-slate-700">التليفون:</span> {cust.mobile}</div>}
-                    {cust?.address && <div><span className="font-bold text-slate-700">العنوان:</span> {cust.address}</div>}
+                  {/* Left: Invoice Number & Date Box */}
+                  <div className="border border-slate-700 rounded overflow-hidden text-xs w-52 shrink-0">
+                    <div className="flex justify-between px-2.5 py-1 border-b border-slate-300 bg-slate-100">
+                      <span className="font-bold text-slate-800">رقم الفاتورة:</span>
+                      <span className="font-mono font-black text-slate-950">{selectedInvoiceForView.invoice_number}</span>
+                    </div>
+                    <div className="flex justify-between px-2.5 py-1 bg-white">
+                      <span className="font-bold text-slate-800">تاريخ الفاتورة:</span>
+                      <span className="font-mono font-bold text-slate-950">{selectedInvoiceForView.invoice_date}</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Line Items Table */}
-                <table className="w-full text-[11px] border-collapse border border-slate-300 mb-3">
+                {/* Line Items Table - Widened and Clear Item Description */}
+                <table className="w-full text-xs border-collapse border border-slate-800 mb-2">
                   <thead>
-                    <tr className="bg-slate-100 text-slate-800 font-bold">
-                      <th className="border border-slate-300 p-1.5 text-center w-8">م</th>
-                      <th className="border border-slate-300 p-1.5 text-right">بيان الصنف</th>
-                      <th className="border border-slate-300 p-1.5 text-center w-14">الوحدة</th>
-                      <th className="border border-slate-300 p-1.5 text-center w-16">الكمية</th>
-                      <th className="border border-slate-300 p-1.5 text-left w-20">سعر اللوح</th>
-                      <th className="border border-slate-300 p-1.5 text-left w-24">الإجمالي</th>
+                    <tr className="bg-slate-200 text-slate-950 font-black text-[12px]">
+                      <th className="border border-slate-700 py-1.5 px-1 text-center w-[6%]">م</th>
+                      <th className="border border-slate-700 py-1.5 px-3 text-right w-[48%]">بيان الصنف</th>
+                      <th className="border border-slate-700 py-1.5 px-1 text-center w-[10%]">الوحدة</th>
+                      <th className="border border-slate-700 py-1.5 px-1 text-center w-[10%]">الكمية</th>
+                      <th className="border border-slate-700 py-1.5 px-2 text-left w-[12%]">سعر اللوح</th>
+                      <th className="border border-slate-700 py-1.5 px-2 text-left w-[14%]">الإجمالي</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((item, idx) => (
-                      <tr key={idx} className="border-b border-slate-200">
-                        <td className="border border-slate-300 p-1.5 text-center font-mono">{idx + 1}</td>
-                        <td className="border border-slate-300 p-1.5 font-semibold text-slate-900">
+                      <tr key={idx} className="border-b border-slate-300">
+                        <td className="border border-slate-400 py-1 px-1 text-center font-mono font-bold text-slate-800">{idx + 1}</td>
+                        <td className="border border-slate-400 py-1 px-3 text-right font-black text-slate-950 text-sm leading-snug">
                           {item.product_name_snapshot}
-                          {item.wood_type_snapshot ? ` (${item.wood_type_snapshot})` : ''}
+                          {item.wood_type_snapshot ? (
+                            <span className="text-xs font-bold text-slate-600 mr-1.5">({item.wood_type_snapshot})</span>
+                          ) : ''}
                         </td>
-                        <td className="border border-slate-300 p-1.5 text-center">لوح</td>
-                        <td className="border border-slate-300 p-1.5 text-center font-mono font-bold">{item.quantity_sheets}</td>
-                        <td className="border border-slate-300 p-1.5 text-left font-mono">{item.unit_price.toLocaleString()}</td>
-                        <td className="border border-slate-300 p-1.5 text-left font-mono font-bold">{item.line_total.toLocaleString()}</td>
+                        <td className="border border-slate-400 py-1 px-1 text-center font-bold text-slate-800">لوح</td>
+                        <td className="border border-slate-400 py-1 px-1 text-center font-mono font-black text-slate-950 text-sm">{item.quantity_sheets}</td>
+                        <td className="border border-slate-400 py-1 px-2 text-left font-mono font-bold text-slate-900">{item.unit_price.toLocaleString()}</td>
+                        <td className="border border-slate-400 py-1 px-2 text-left font-mono font-black text-slate-950 text-sm">{item.line_total.toLocaleString()}</td>
                       </tr>
                     ))}
                     {items.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="border border-slate-300 p-3 text-center text-slate-400">لا توجد أصناف</td>
+                        <td colSpan={6} className="border border-slate-400 py-3 text-center text-slate-400 font-bold">لا توجد أصناف</td>
                       </tr>
                     )}
                   </tbody>
                 </table>
 
-                {/* Totals Box */}
-                <div className="flex justify-between items-start gap-4 mb-3">
-                  <div className="flex-1 text-[11px] space-y-1.5">
-                    <div className="p-2 border border-slate-200 rounded bg-slate-50">
-                      <span className="font-bold text-slate-700">فقط وقدره: </span>
-                      <span className="font-semibold text-slate-900">{amountToArabicWords(selectedInvoiceForView.total)}</span>
+                {/* Bank-Style Full Width Horizontal Tafqeet & Payment Bar */}
+                <div className="border border-slate-800 rounded bg-slate-50 p-2 mb-2 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-300 pb-1.5 mb-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-extrabold text-slate-900 text-sm">المبلغ بالحروف:</span>
+                      <span className="font-black text-slate-950 text-sm bg-amber-100/70 px-2.5 py-0.5 rounded border border-amber-400">
+                        {amountToArabicWords(selectedInvoiceForView.total)}
+                      </span>
                     </div>
-                    {selectedInvoiceForView.notes && (
-                      <div className="text-[10px] text-slate-600">
-                        <span className="font-bold">ملاحظات: </span>{selectedInvoiceForView.notes}
+                  </div>
+                  
+                  {/* Horizontal Financial Summary like Bank Deposit */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                    <div className="p-1 bg-white border border-slate-300 rounded">
+                      <div className="text-[10px] font-bold text-slate-600">إجمالي الفاتورة</div>
+                      <div className="font-mono font-black text-slate-950 text-sm">{selectedInvoiceForView.subtotal.toLocaleString()} ج.م</div>
+                    </div>
+                    {selectedInvoiceForView.discount > 0 && (
+                      <div className="p-1 bg-white border border-slate-300 rounded">
+                        <div className="text-[10px] font-bold text-rose-600">قيمة الخصم</div>
+                        <div className="font-mono font-black text-rose-700 text-sm">-{selectedInvoiceForView.discount.toLocaleString()} ج.م</div>
                       </div>
                     )}
+                    <div className="p-1 bg-amber-50 border border-amber-400 rounded">
+                      <div className="text-[10px] font-extrabold text-slate-800">صافي المطلوب</div>
+                      <div className="font-mono font-black text-slate-950 text-sm">{selectedInvoiceForView.total.toLocaleString()} ج.م</div>
+                    </div>
+                    <div className="p-1 bg-emerald-50 border border-emerald-400 rounded">
+                      <div className="text-[10px] font-extrabold text-emerald-800">المدفوع نقداً</div>
+                      <div className="font-mono font-black text-emerald-700 text-sm">{selectedInvoiceForView.paid_amount.toLocaleString()} ج.م</div>
+                    </div>
+                    <div className="p-1 bg-rose-50 border border-rose-300 rounded">
+                      <div className="text-[10px] font-extrabold text-rose-800">المتبقي (آجل)</div>
+                      <div className="font-mono font-black text-rose-700 text-sm">{selectedInvoiceForView.remaining_balance.toLocaleString()} ج.م</div>
+                    </div>
                   </div>
 
-                  <table className="text-[11px] border-collapse border border-slate-300 w-56">
-                    <tbody>
-                      <tr>
-                        <td className="border border-slate-300 p-1.5 font-bold bg-slate-100 text-slate-700">إجمالي الأصناف:</td>
-                        <td className="border border-slate-300 p-1.5 text-left font-mono">{selectedInvoiceForView.subtotal.toLocaleString()} ج.م</td>
-                      </tr>
-                      {selectedInvoiceForView.discount > 0 && (
-                        <tr>
-                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-100 text-slate-700">قيمة الخصم:</td>
-                          <td className="border border-slate-300 p-1.5 text-left font-mono text-rose-600">-{selectedInvoiceForView.discount.toLocaleString()} ج.م</td>
-                        </tr>
-                      )}
-                      <tr>
-                        <td className="border border-slate-300 p-1.5 font-bold bg-slate-100 text-slate-900">صافي الفاتورة:</td>
-                        <td className="border border-slate-300 p-1.5 text-left font-mono font-black">{selectedInvoiceForView.total.toLocaleString()} ج.م</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-slate-300 p-1.5 font-bold bg-slate-100 text-slate-700">المدفوع نقداً:</td>
-                        <td className="border border-slate-300 p-1.5 text-left font-mono font-bold text-emerald-700">{selectedInvoiceForView.paid_amount.toLocaleString()} ج.م</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-slate-300 p-1.5 font-bold bg-slate-100 text-slate-700">المتبقي (دين على العميل):</td>
-                        <td className="border border-slate-300 p-1.5 text-left font-mono font-bold text-rose-700">{selectedInvoiceForView.remaining_balance.toLocaleString()} ج.م</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  {selectedInvoiceForView.notes && (
+                    <div className="text-[11px] text-slate-700 mt-1.5 pt-1.5 border-t border-slate-200">
+                      <span className="font-bold">ملاحظات: </span>{selectedInvoiceForView.notes}
+                    </div>
+                  )}
                 </div>
 
                 {/* Signatures */}
-                <div className="flex justify-between pt-6 mt-4 border-t border-slate-200 text-xs">
+                <div className="flex justify-between pt-4 mt-2 border-t border-slate-300 text-xs">
                   <div className="text-center w-36">
-                    <div className="font-bold text-slate-700 mb-6">أمين المخزن المسلِّم</div>
-                    <div className="border-t border-dashed border-slate-400" />
+                    <div className="font-bold text-slate-800 mb-5">أمين المخزن المسلِّم</div>
+                    <div className="border-t border-dashed border-slate-500" />
                   </div>
                   <div className="text-center w-36">
-                    <div className="font-bold text-slate-700 mb-6">توقيع العميل المستلم</div>
-                    <div className="border-t border-dashed border-slate-400" />
+                    <div className="font-bold text-slate-800 mb-5">توقيع العميل المستلم</div>
+                    <div className="border-t border-dashed border-slate-500" />
                   </div>
                   <div className="text-center w-36">
-                    <div className="font-bold text-slate-700 mb-6">المحاسب المسؤول</div>
-                    <div className="border-t border-dashed border-slate-400" />
+                    <div className="font-bold text-slate-800 mb-5">المحاسب المسؤول</div>
+                    <div className="border-t border-dashed border-slate-500" />
                   </div>
                 </div>
               </div>
