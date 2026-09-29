@@ -6,6 +6,11 @@
   --font-mono: 'JetBrains Mono', monospace;
 }
 
+html {
+  scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+}
+
 @layer base {
   * {
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -24,6 +29,20 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     letter-spacing: -0.01em;
+    overflow-x: hidden;
+  }
+
+  /* Buttery smooth and snappy interactive transitions */
+  button, a, input, select, textarea {
+    transition: background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  button:active, a:active {
+    transform: scale(0.985);
   }
 
   /* Bold, punchy headings and titles */
@@ -85,6 +104,22 @@
   .tabular-nums, .font-mono, td, input[type="number"] {
     font-feature-settings: "tnum" 1;
     font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Smooth, snappy page transition */
+main {
+  animation: smoothPageFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes smoothPageFadeIn {
+  0% {
+    opacity: 0.92;
+    transform: translateY(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
