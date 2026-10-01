@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Loader2, CheckCircle2, AlertTriangle, Banknote } from 'lucide-react';
 import { Product } from '../types';
 import {
@@ -11,13 +12,15 @@ import {
 } from '../services/bulkPriceService';
 
 interface BulkPriceUpdateModalProps {
+  isOpen?: boolean;
   woodType: string;
   selectedProducts: Product[];
-  performedBy: string;
+  performedBy?: string;
   language: 'ar' | 'en';
   onClose: () => void;
   /** Called after a successful (even partially successful) update so the parent can refresh product data. */
-  onUpdated: () => void;
+  onUpdated?: () => void;
+  onSuccess?: () => void;
 }
 
 const MODE_LABELS: Record<BulkPriceMode, { ar: string; short: string }> = {
@@ -31,12 +34,14 @@ const MODE_LABELS: Record<BulkPriceMode, { ar: string; short: string }> = {
 type Step = 'form' | 'confirm' | 'result';
 
 export const BulkPriceUpdateModal: React.FC<BulkPriceUpdateModalProps> = ({
+  isOpen = true,
   woodType,
   selectedProducts,
-  performedBy,
+  performedBy = 'المستخدم',
   language,
   onClose,
   onUpdated,
+  onSuccess,
 }) => {
   const [mode, setMode] = useState<BulkPriceMode>('set');
   const [valueInput, setValueInput] = useState('');
@@ -105,13 +110,16 @@ export const BulkPriceUpdateModal: React.FC<BulkPriceUpdateModalProps> = ({
     setResult(res);
     setStep('result');
     if (res.success && res.updatedCount > 0) {
-      onUpdated();
+      if (onUpdated) onUpdated();
+      if (onSuccess) onSuccess();
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4" dir={isAr ? 'rtl' : 'ltr'}>
-      <div className="bg-slate-900 rounded-lg max-w-lg w-full p-5 shadow-2xl space-y-4 border border-slate-800 text-slate-100">
+  if (!isOpen) return null;
+
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto" dir={isAr ? 'rtl' : 'ltr'}>
+      <div className="bg-slate-900 rounded-lg max-w-lg w-full p-5 shadow-2xl space-y-4 border border-slate-800 text-slate-100 my-auto">
         <div className="flex items-center justify-between border-b pb-3 border-slate-800">
           <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
             <Banknote className="w-4 h-4 text-amber-400" />
@@ -330,4 +338,6 @@ export const BulkPriceUpdateModal: React.FC<BulkPriceUpdateModalProps> = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 };

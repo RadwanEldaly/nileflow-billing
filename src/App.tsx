@@ -30,7 +30,8 @@ import { ImportPage } from './pages/ImportPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { BackupModal } from './components/BackupModal';
 import { LoadingScreen } from './components/LoadingScreen';
-import { classificationService } from './services/classificationService';
+import { classificationService, SEED_CATEGORIES, SEED_WOOD_TYPES } from './services/classificationService';
+import { erpBackendService } from './services/erpBackendService';
 
 export function App() {
   const [language, setLanguage] = useState<'ar' | 'en'>('ar');
@@ -76,8 +77,8 @@ export function App() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [woodTypes, setWoodTypes] = useState<WoodType[]>([]);
+  const [categories, setCategories] = useState<Category[]>(SEED_CATEGORIES);
+  const [woodTypes, setWoodTypes] = useState<WoodType[]>(SEED_WOOD_TYPES);
   const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<string>('all');
   const [catalogTypeFilter, setCatalogTypeFilter] = useState<string>('all');
   const [salesInvoices, setSalesInvoices] = useState<SalesInvoice[]>([]);
@@ -359,81 +360,71 @@ export function App() {
   };
 
   const handleCreateSalesInvoice = async (invoiceData: Omit<SalesInvoice, 'id' | 'created_at'>) => {
-    const { items, ...rawRecord } = invoiceData;
-    
-    // Explicitly sanitize and map only valid columns for sales_invoices table in Supabase
-    const invoiceRecord = {
-      invoice_number: rawRecord.invoice_number,
-      customer_id: rawRecord.customer_id,
-      warehouse_id: rawRecord.warehouse_id || warehouses[0]?.id,
-      invoice_date: rawRecord.invoice_date,
-      status: rawRecord.status || 'approved',
-      subtotal: rawRecord.subtotal || 0,
-      discount: rawRecord.discount || 0,
-      total: rawRecord.total || 0,
-      paid_amount: rawRecord.paid_amount || 0,
-      remaining_balance: rawRecord.remaining_balance || 0,
-      notes: rawRecord.notes || '',
-    };
-
-    // Insert invoice
-    const { data: invData, error: invError } = await supabase.from('sales_invoices').insert([invoiceRecord]).select();
-    if (invError) {
-      console.error('Error creating sales invoice:', invError);
-      alert('خطأ أثناء حفظ فاتورة المبيعات: ' + (invError.message || JSON.stringify(invError)));
-      return;
-    }
-
-    if (invData && invData[0]) {
-      const newInvoice = invData[0];
+    try {
+      const { items, ...rawRecord } = invoiceData;
       
-      // Insert items
+      const invoiceRecord = {
+        invoice_number: rawRecord.invoice_number,
+        customer_id: rawRecord.customer_id,
+        warehouse_id: rawRecord.warehouse_id || warehouses[0]?.id,
+        invoice_date: rawRecord.invoice_date,
+        status: rawRecord.status || 'approved',
+        subtotal: rawRecord.subtotal || 0,
+        discount: rawRecord.discount || 0,
+        total: rawRecord.total || 0,
+        paid_amount: rawRecord.paid_amount || 0,
+        remaining_balance: rawRecord.remaining_balance || 0,
+        notes: rawRecord.notes || '',
+      };
+
+      const result = await erpBackendService.createSalesInvoice({
+        invoice: invoiceRecord as any,
+        items: (items || []).map((it) => ({
+          product_id: it.product_id,
+          product_name_snapshot: it.product_name_snapshot || 'لوح خشب',
+          wood_type_snapshot: it.wood_type_snapshot || 'ألواح',
+          quantity_sheets: it.quantity_sheets || 1,
+          unit_price: it.unit_price || 0,
+          line_total: it.line_total || 0,
+        })),
+      });
+
+      // Update state seamlessly
+      setSalesInvoices((prev) => [result.invoice, ...prev]);
+
+      // Deduct stock in local state
       if (items && items.length > 0) {
-        const itemsToInsert = items.map(item => ({
-          invoice_id: newInvoice.id,
-          product_id: item.product_id || null,
-          product_name_snapshot: item.product_name_snapshot || 'لوح خشب',
-          wood_type_snapshot: item.wood_type_snapshot || 'ألواح',
-          quantity_sheets: item.quantity_sheets || 1,
-          unit_price: item.unit_price || 0,
-          line_total: item.line_total || 0,
-        }));
-        const { error: itemsError } = await supabase.from('sales_invoice_items').insert(itemsToInsert);
-        if (itemsError) {
-          console.error('Error inserting sales invoice items:', itemsError);
-          alert('خطأ في حفظ بنود الفاتورة: ' + itemsError.message);
-        }
-        newInvoice.items = itemsToInsert as any;
+        setProducts((prev) =>
+          prev.map((p) => {
+            const soldItem = items.find((it) => it.product_id === p.id);
+            if (soldItem) {
+              return {
+                ...p,
+                stock_quantity: (p.stock_quantity || 0) - soldItem.quantity_sheets,
+              };
+            }
+            return p;
+          })
+        );
       }
 
-      setSalesInvoices((prev) => [newInvoice, ...prev]);
-
-      // Deduct stock
-      if (items) {
-        for (const item of items) {
-          if (item.product_id) {
-            await handleAddStockMovement({
-              product_id: item.product_id,
-              product_name: item.product_name_snapshot,
-              warehouse_id: newInvoice.warehouse_id,
-              movement_type: 'sale',
-              quantity: -item.quantity_sheets,
-              reference_id: newInvoice.invoice_number,
-              notes: `فاتورة بيع ألواح رقم ${newInvoice.invoice_number}`,
-            });
-          }
-        }
+      // Update customer balance in local state
+      if (result.updatedCustomer) {
+        setCustomers((prev) =>
+          prev.map((c) => (c.id === result.updatedCustomer!.id ? result.updatedCustomer! : c))
+        );
+      } else if (invoiceRecord.customer_id && invoiceRecord.remaining_balance !== 0) {
+        setCustomers((prev) =>
+          prev.map((c) =>
+            c.id === invoiceRecord.customer_id
+              ? { ...c, balance: (c.balance || 0) + invoiceRecord.remaining_balance }
+              : c
+          )
+        );
       }
-
-      // Update customer balance
-      const cust = customers.find((c) => c.id === newInvoice.customer_id);
-      if (cust) {
-        const updatedBalance = (cust.balance || 0) + newInvoice.remaining_balance;
-        const { data: updatedCust } = await supabase.from('customers').update({ balance: updatedBalance }).eq('id', cust.id).select();
-        if (updatedCust && updatedCust[0]) {
-          setCustomers((prev) => prev.map((c) => (c.id === cust.id ? updatedCust[0] : c)));
-        }
-      }
+    } catch (err: any) {
+      console.error('Error creating sales invoice:', err);
+      alert(language === 'ar' ? 'خطأ أثناء حفظ فاتورة المبيعات: ' + (err.message || '') : 'Error creating sales invoice: ' + (err.message || ''));
     }
   };
 
@@ -556,53 +547,71 @@ export function App() {
   };
 
   const handleCreatePurchaseInvoice = async (invoiceData: Omit<PurchaseInvoice, 'id' | 'created_at'>) => {
-    const { items, ...invoiceRecord } = invoiceData;
-    
-    // Insert invoice
-    const { data: invData, error: invError } = await supabase.from('purchase_invoices').insert([invoiceRecord]).select();
-    if (invData && invData[0]) {
-      const newInvoice = invData[0];
+    try {
+      const { items, ...rawRecord } = invoiceData;
       
-      // Insert items
+      const invoiceRecord = {
+        invoice_number: rawRecord.invoice_number,
+        supplier_id: rawRecord.supplier_id,
+        warehouse_id: rawRecord.warehouse_id || warehouses[0]?.id,
+        invoice_date: rawRecord.invoice_date,
+        status: rawRecord.status || 'approved',
+        subtotal: rawRecord.subtotal || 0,
+        discount: rawRecord.discount || 0,
+        total: rawRecord.total || 0,
+        paid_amount: rawRecord.paid_amount || 0,
+        remaining_balance: rawRecord.remaining_balance || 0,
+        notes: rawRecord.notes || '',
+      };
+
+      const result = await erpBackendService.createPurchaseInvoice({
+        invoice: invoiceRecord as any,
+        items: (items || []).map((it) => ({
+          product_id: it.product_id,
+          product_name_snapshot: it.product_name_snapshot || 'لوح خشب',
+          wood_type_snapshot: it.wood_type_snapshot || 'ألواح',
+          quantity_sheets: it.quantity_sheets || 1,
+          unit_price: it.unit_price || 0,
+          line_total: it.line_total || 0,
+        })),
+      });
+
+      setPurchaseInvoices((prev) => [result.invoice, ...prev]);
+
+      // Add stock to products in local state
       if (items && items.length > 0) {
-        const itemsToInsert = items.map(item => ({
-          ...item,
-          invoice_id: newInvoice.id
-        }));
-        await supabase.from('purchase_invoice_items').insert(itemsToInsert);
-        newInvoice.items = itemsToInsert;
+        setProducts((prev) =>
+          prev.map((p) => {
+            const boughtItem = items.find((it) => it.product_id === p.id);
+            if (boughtItem) {
+              return {
+                ...p,
+                stock_quantity: (p.stock_quantity || 0) + boughtItem.quantity_sheets,
+                purchase_price: boughtItem.unit_price > 0 ? boughtItem.unit_price : p.purchase_price,
+              };
+            }
+            return p;
+          })
+        );
       }
 
-      setPurchaseInvoices([newInvoice, ...purchaseInvoices]);
-
-      // Add stock
-      if (items) {
-        for (const item of items) {
-          if (item.product_id) {
-            await handleAddStockMovement({
-              product_id: item.product_id,
-              product_name: item.product_name_snapshot,
-              warehouse_id: newInvoice.warehouse_id,
-              movement_type: 'purchase',
-              quantity: item.quantity_sheets,
-              reference_id: newInvoice.invoice_number,
-              notes: `فاتورة شراء ألواح رقم ${newInvoice.invoice_number}`,
-            });
-          }
-        }
+      // Update supplier balance in local state
+      if (result.updatedSupplier) {
+        setSuppliers((prev) =>
+          prev.map((s) => (s.id === result.updatedSupplier!.id ? result.updatedSupplier! : s))
+        );
+      } else if (invoiceRecord.supplier_id && invoiceRecord.remaining_balance !== 0) {
+        setSuppliers((prev) =>
+          prev.map((s) =>
+            s.id === invoiceRecord.supplier_id
+              ? { ...s, balance: (s.balance || 0) + invoiceRecord.remaining_balance }
+              : s
+          )
+        );
       }
-
-      // Update supplier balance
-      const sup = suppliers.find((s) => s.id === newInvoice.supplier_id);
-      if (sup) {
-        const updatedBalance = (sup.balance || 0) + newInvoice.remaining_balance;
-        const { data: updatedSup } = await supabase.from('suppliers').update({ balance: updatedBalance }).eq('id', sup.id).select();
-        if (updatedSup && updatedSup[0]) {
-          setSuppliers(suppliers.map((s) => (s.id === sup.id ? updatedSup[0] : s)));
-        }
-      }
-    } else {
-      console.error('Error creating purchase invoice:', invError);
+    } catch (err: any) {
+      console.error('Error creating purchase invoice:', err);
+      alert(language === 'ar' ? 'خطأ أثناء حفظ فاتورة المشتريات: ' + (err.message || '') : 'Failed to create purchase invoice: ' + (err.message || ''));
     }
   };
 
@@ -610,39 +619,37 @@ export function App() {
     const invoice = salesInvoices.find((i) => i.id === invoiceId);
     if (!invoice) return;
 
-    // Reverse stock: give back every sheet this invoice had deducted
-    if (invoice.items) {
-      for (const item of invoice.items) {
-        if (item.product_id) {
-          await handleAddStockMovement({
-            product_id: item.product_id,
-            product_name: item.product_name_snapshot,
-            warehouse_id: invoice.warehouse_id,
-            movement_type: 'sales_return',
-            quantity: item.quantity_sheets,
-            reference_id: invoice.invoice_number,
-            notes: `إلغاء/حذف فاتورة بيع رقم ${invoice.invoice_number}`,
-          });
-        }
-      }
-    }
+    try {
+      await erpBackendService.deleteSalesInvoice(invoiceId, invoice);
 
-    // Reverse the customer's balance (undo what this invoice had added as debt)
-    const cust = customers.find((c) => c.id === invoice.customer_id);
-    if (cust) {
-      const updatedBalance = (cust.balance || 0) - invoice.remaining_balance;
-      const { data: updatedCust } = await supabase.from('customers').update({ balance: updatedBalance }).eq('id', cust.id).select();
-      if (updatedCust && updatedCust[0]) {
-        setCustomers(customers.map((c) => (c.id === cust.id ? updatedCust[0] : c)));
+      // Restore stock in state
+      if (invoice.items) {
+        setProducts((prev) =>
+          prev.map((p) => {
+            const item = invoice.items?.find((it) => it.product_id === p.id);
+            if (item) {
+              return { ...p, stock_quantity: (p.stock_quantity || 0) + item.quantity_sheets };
+            }
+            return p;
+          })
+        );
       }
-    }
 
-    // Delete the invoice (sales_invoice_items cascade-delete automatically)
-    const { error } = await supabase.from('sales_invoices').delete().eq('id', invoiceId);
-    if (!error) {
-      setSalesInvoices(salesInvoices.filter((i) => i.id !== invoiceId));
-    } else {
-      console.error('Error deleting sales invoice:', error);
+      // Restore customer balance in state
+      if (invoice.customer_id && invoice.remaining_balance !== 0) {
+        setCustomers((prev) =>
+          prev.map((c) =>
+            c.id === invoice.customer_id
+              ? { ...c, balance: (c.balance || 0) - invoice.remaining_balance }
+              : c
+          )
+        );
+      }
+
+      setSalesInvoices((prev) => prev.filter((i) => i.id !== invoiceId));
+    } catch (err: any) {
+      console.error('Error deleting sales invoice:', err);
+      alert(language === 'ar' ? 'فشل حذف فاتورة المبيعات: ' + (err.message || '') : 'Failed to delete sales invoice');
     }
   };
 
@@ -650,39 +657,37 @@ export function App() {
     const invoice = purchaseInvoices.find((i) => i.id === invoiceId);
     if (!invoice) return;
 
-    // Reverse stock: remove back out every sheet this invoice had added
-    if (invoice.items) {
-      for (const item of invoice.items) {
-        if (item.product_id) {
-          await handleAddStockMovement({
-            product_id: item.product_id,
-            product_name: item.product_name_snapshot,
-            warehouse_id: invoice.warehouse_id,
-            movement_type: 'purchase_return',
-            quantity: -item.quantity_sheets,
-            reference_id: invoice.invoice_number,
-            notes: `إلغاء/حذف فاتورة شراء رقم ${invoice.invoice_number}`,
-          });
-        }
-      }
-    }
+    try {
+      await erpBackendService.deletePurchaseInvoice(invoiceId, invoice);
 
-    // Reverse the supplier's balance (undo what this invoice had added as payable)
-    const sup = suppliers.find((s) => s.id === invoice.supplier_id);
-    if (sup) {
-      const updatedBalance = (sup.balance || 0) - invoice.remaining_balance;
-      const { data: updatedSup } = await supabase.from('suppliers').update({ balance: updatedBalance }).eq('id', sup.id).select();
-      if (updatedSup && updatedSup[0]) {
-        setSuppliers(suppliers.map((s) => (s.id === sup.id ? updatedSup[0] : s)));
+      // Deduct stock in state
+      if (invoice.items) {
+        setProducts((prev) =>
+          prev.map((p) => {
+            const item = invoice.items?.find((it) => it.product_id === p.id);
+            if (item) {
+              return { ...p, stock_quantity: (p.stock_quantity || 0) - item.quantity_sheets };
+            }
+            return p;
+          })
+        );
       }
-    }
 
-    // Delete the invoice (purchase_invoice_items cascade-delete automatically)
-    const { error } = await supabase.from('purchase_invoices').delete().eq('id', invoiceId);
-    if (!error) {
-      setPurchaseInvoices(purchaseInvoices.filter((i) => i.id !== invoiceId));
-    } else {
-      console.error('Error deleting purchase invoice:', error);
+      // Deduct supplier balance in state
+      if (invoice.supplier_id && invoice.remaining_balance !== 0) {
+        setSuppliers((prev) =>
+          prev.map((s) =>
+            s.id === invoice.supplier_id
+              ? { ...s, balance: (s.balance || 0) - invoice.remaining_balance }
+              : s
+          )
+        );
+      }
+
+      setPurchaseInvoices((prev) => prev.filter((i) => i.id !== invoiceId));
+    } catch (err: any) {
+      console.error('Error deleting purchase invoice:', err);
+      alert(language === 'ar' ? 'فشل حذف فاتورة المشتريات: ' + (err.message || '') : 'Failed to delete purchase invoice');
     }
   };
 
@@ -707,83 +712,42 @@ export function App() {
       const count = salesInvoices.filter((i) => i.invoice_number.startsWith('RET-SALES-')).length + 1;
       const invoiceNumber = `RET-SALES-${year}-${String(count).padStart(4, '0')}`;
 
-      const invoiceRecord = {
-        invoice_number: invoiceNumber,
-        customer_id: returnData.customerId,
-        warehouse_id: returnData.warehouseId || warehouses[0]?.id,
-        invoice_date: new Date().toISOString().slice(0, 10),
-        status: 'approved',
-        subtotal: returnData.total,
-        discount: 0,
-        total: returnData.total,
-        paid_amount: returnData.refundMethod === 'cash' ? returnData.total : 0,
-        remaining_balance: returnData.refundMethod === 'credit' ? returnData.total : 0,
-        notes: `مرتجع مبيعات ${returnData.originalInvoiceNumber ? 'للفاتورة ' + returnData.originalInvoiceNumber : ''} ${returnData.notes ? '- ' + returnData.notes : ''}`.trim(),
-      };
+      const result = await erpBackendService.processSalesReturn({
+        ...returnData,
+        invoiceNumber,
+      });
 
-      const { data: invData, error: invError } = await supabase.from('sales_invoices').insert([invoiceRecord]).select();
-      if (!invData || !invData[0]) {
-        console.error('Error creating sales return:', invError);
-        alert(language === 'ar' ? 'فشل تسجيل مرتجع المبيعات: ' + (invError?.message || '') : 'Failed to create sales return');
-        return;
-      }
+      setSalesInvoices((prev) => [result.invoice, ...prev]);
 
-      const returnInvoiceId = invData[0].id;
-      let insertedItems: SalesInvoiceItem[] = [];
-
+      // Restock returned sheets in local products state
       if (returnData.items.length > 0) {
-        const itemsToInsert = returnData.items.map((it) => ({
-          invoice_id: returnInvoiceId,
-          product_id: it.productId || null,
-          product_name_snapshot: it.productName,
-          wood_type_snapshot: it.woodType || 'MDF',
-          quantity_sheets: it.quantitySheets,
-          unit_price: it.unitPrice,
-          line_total: it.lineTotal,
-        }));
-
-        const { data: itemsData } = await supabase.from('sales_invoice_items').insert(itemsToInsert).select();
-        if (itemsData) insertedItems = itemsData;
+        setProducts((prev) =>
+          prev.map((p) => {
+            const returnedItem = returnData.items.find((it) => it.productId === p.id);
+            if (returnedItem) {
+              return {
+                ...p,
+                stock_quantity: (p.stock_quantity || 0) + returnedItem.quantitySheets,
+              };
+            }
+            return p;
+          })
+        );
       }
 
-      setSalesInvoices([{ ...invData[0], items: insertedItems }, ...salesInvoices]);
-
-      // Stock movements: restock returned sheets with positive quantity
-      for (const it of returnData.items) {
-        if (it.productId) {
-          await handleAddStockMovement({
-            product_id: it.productId,
-            product_name: it.productName,
-            warehouse_id: invoiceRecord.warehouse_id,
-            movement_type: 'sales_return',
-            quantity: it.quantitySheets,
-            reference_id: invoiceNumber,
-            notes: `مرتجع مبيعات ${invoiceNumber}`,
-          });
-        }
-      }
-
-      // Financial balance adjustments:
-      if (returnData.refundMethod === 'credit') {
-        const cust = customers.find((c) => c.id === returnData.customerId);
-        if (cust) {
-          const updatedBalance = (cust.balance || 0) - returnData.total;
-          const { data: updatedCust } = await supabase.from('customers').update({ balance: updatedBalance }).eq('id', cust.id).select();
-          if (updatedCust && updatedCust[0]) {
-            setCustomers(customers.map((c) => (c.id === cust.id ? updatedCust[0] : c)));
-          }
-        }
-      } else {
-        await handleAddTransaction({
-          transaction_type: 'customer_payment',
-          party_type: 'customer',
-          party_id: returnData.customerId,
-          amount: -returnData.total,
-          payment_method: 'cash',
-          reference_invoice_id: returnInvoiceId,
-          transaction_date: invoiceRecord.invoice_date,
-          notes: `رد نقدي لمرتجع مبيعات رقم ${invoiceNumber}`,
-        });
+      // Customer balance adjustment in local state
+      if (result.updatedCustomer) {
+        setCustomers((prev) =>
+          prev.map((c) => (c.id === result.updatedCustomer!.id ? result.updatedCustomer! : c))
+        );
+      } else if (returnData.refundMethod === 'credit' && returnData.customerId) {
+        setCustomers((prev) =>
+          prev.map((c) =>
+            c.id === returnData.customerId
+              ? { ...c, balance: (c.balance || 0) - returnData.total }
+              : c
+          )
+        );
       }
 
       alert(language === 'ar' ? `تم تسجيل مرتجع المبيعات رقم ${invoiceNumber} وإعادة الألواح للمخزن بنجاح!` : `Sales return ${invoiceNumber} created successfully!`);
@@ -814,68 +778,42 @@ export function App() {
       const count = purchaseInvoices.filter((i) => i.invoice_number.startsWith('RET-PURCH-')).length + 1;
       const invoiceNumber = `RET-PURCH-${year}-${String(count).padStart(4, '0')}`;
 
-      const invoiceRecord = {
-        invoice_number: invoiceNumber,
-        supplier_id: returnData.supplierId,
-        warehouse_id: returnData.warehouseId || warehouses[0]?.id,
-        invoice_date: new Date().toISOString().slice(0, 10),
-        status: 'approved',
-        total: returnData.total,
-        paid_amount: returnData.refundMethod === 'cash' ? returnData.total : 0,
-        remaining_balance: returnData.refundMethod === 'credit' ? returnData.total : 0,
-        notes: `مرتجع مشتريات ${returnData.originalInvoiceNumber ? 'للفاتورة ' + returnData.originalInvoiceNumber : ''} ${returnData.notes ? '- ' + returnData.notes : ''}`.trim(),
-      };
+      const result = await erpBackendService.processPurchaseReturn({
+        ...returnData,
+        invoiceNumber,
+      });
 
-      const { data: invData, error: invError } = await supabase.from('purchase_invoices').insert([invoiceRecord]).select();
-      if (!invData || !invData[0]) {
-        console.error('Error creating purchase return:', invError);
-        alert(language === 'ar' ? 'فشل تسجيل مرتجع المشتريات: ' + (invError?.message || '') : 'Failed to create purchase return');
-        return;
-      }
+      setPurchaseInvoices((prev) => [result.invoice, ...prev]);
 
-      const returnInvoiceId = invData[0].id;
-      let insertedItems: any[] = [];
-
+      // Remove returned sheets from local products state
       if (returnData.items.length > 0) {
-        const itemsToInsert = returnData.items.map((it) => ({
-          invoice_id: returnInvoiceId,
-          product_id: it.productId || null,
-          product_name_snapshot: it.productName,
-          wood_type_snapshot: it.woodType || 'MDF',
-          quantity_sheets: it.quantitySheets,
-          unit_price: it.unitPrice,
-          line_total: it.lineTotal,
-        }));
-
-        const { data: itemsData } = await supabase.from('purchase_invoice_items').insert(itemsToInsert).select();
-        if (itemsData) insertedItems = itemsData;
+        setProducts((prev) =>
+          prev.map((p) => {
+            const returnedItem = returnData.items.find((it) => it.productId === p.id);
+            if (returnedItem) {
+              return {
+                ...p,
+                stock_quantity: (p.stock_quantity || 0) - returnedItem.quantitySheets,
+              };
+            }
+            return p;
+          })
+        );
       }
 
-      setPurchaseInvoices([{ ...invData[0], items: insertedItems }, ...purchaseInvoices]);
-
-      // Stock movements: remove returned sheets with negative quantity
-      for (const it of returnData.items) {
-        if (it.productId) {
-          await handleAddStockMovement({
-            product_id: it.productId,
-            product_name: it.productName,
-            warehouse_id: invoiceRecord.warehouse_id,
-            movement_type: 'purchase_return',
-            quantity: -it.quantitySheets,
-            reference_id: invoiceNumber,
-            notes: `مرتجع مشتريات ${invoiceNumber}`,
-          });
-        }
-      }
-
-      // Financial balance adjustments: reduce supplier debt
-      const sup = suppliers.find((s) => s.id === returnData.supplierId);
-      if (sup) {
-        const updatedBalance = (sup.balance || 0) - returnData.total;
-        const { data: updatedSup } = await supabase.from('suppliers').update({ balance: updatedBalance }).eq('id', sup.id).select();
-        if (updatedSup && updatedSup[0]) {
-          setSuppliers(suppliers.map((s) => (s.id === sup.id ? updatedSup[0] : s)));
-        }
+      // Supplier balance adjustment in local state
+      if (result.updatedSupplier) {
+        setSuppliers((prev) =>
+          prev.map((s) => (s.id === result.updatedSupplier!.id ? result.updatedSupplier! : s))
+        );
+      } else if (returnData.supplierId) {
+        setSuppliers((prev) =>
+          prev.map((s) =>
+            s.id === returnData.supplierId
+              ? { ...s, balance: (s.balance || 0) - returnData.total }
+              : s
+          )
+        );
       }
 
       alert(language === 'ar' ? `تم تسجيل مرتجع المشتريات رقم ${invoiceNumber} وخصم الألواح من المخزن بنجاح!` : `Purchase return ${invoiceNumber} created successfully!`);

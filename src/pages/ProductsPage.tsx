@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Product, Supplier, StockMovement, Category, WoodType } from '../types';
 import {
   Search,
@@ -23,6 +24,7 @@ import {
   Tag,
 } from 'lucide-react';
 import { BulkPriceUpdateModal } from '../components/BulkPriceUpdateModal';
+import { SEED_CATEGORIES, SEED_WOOD_TYPES } from '../services/classificationService';
 
 interface ProductsPageProps {
   products: Product[];
@@ -96,39 +98,63 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     if (initialTypeFilter) setSelectedWoodType(initialTypeFilter);
   }, [initialCategoryFilter, initialTypeFilter]);
 
+  // Unified, resilient categories list: props -> seeds -> product categories
+  const allCategories = useMemo(() => {
+    const base = categories && categories.length > 0 ? categories : SEED_CATEGORIES;
+    const map = new Map<string, Category>();
+    for (const c of base) {
+      map.set(c.name.trim().toLowerCase(), c);
+    }
+    for (const p of products) {
+      const cat = (p.category || '').trim();
+      if (cat && cat !== 'ألواح أخشاب' && !map.has(cat.toLowerCase())) {
+        map.set(cat.toLowerCase(), { id: `cat-custom-${cat}`, name: cat, description: '' });
+      }
+    }
+    return Array.from(map.values());
+  }, [categories, products]);
+
+  // Unified, resilient wood types list: props -> seeds -> product types
+  const allWoodTypes = useMemo(() => {
+    const base = woodTypesList && woodTypesList.length > 0 ? woodTypesList : SEED_WOOD_TYPES;
+    const map = new Map<string, WoodType>();
+    for (const wt of base) {
+      map.set(wt.name.trim().toLowerCase(), wt);
+    }
+    for (const p of products) {
+      const wt = (p.wood_type || '').trim();
+      if (wt && !map.has(wt.toLowerCase())) {
+        map.set(wt.toLowerCase(), { id: `type-custom-${wt}`, name: wt, category_id: null });
+      }
+    }
+    return Array.from(map.values());
+  }, [woodTypesList, products]);
+
   // Fast mapping from type name to parent category name
   const woodTypeToCategoryName = useMemo(() => {
     const map = new Map<string, string>();
     const catIdToName = new Map<string, string>();
-    for (const c of categories) {
+    for (const c of allCategories) {
       catIdToName.set(c.id, c.name);
     }
-    for (const wt of woodTypesList) {
+    for (const wt of allWoodTypes) {
       if (wt.category_id && catIdToName.has(wt.category_id)) {
         map.set(wt.name.trim().toLowerCase(), catIdToName.get(wt.category_id)!);
       }
     }
     return map;
-  }, [categories, woodTypesList]);
+  }, [allCategories, allWoodTypes]);
 
-  // Context-aware wood types for the filter bar
-  const availableFilterWoodTypes = useMemo(() => {
-    const allDistinctTypes = Array.from(new Set(products.map((p) => (p.wood_type || '').trim()).filter(Boolean)));
+  // Helper: Get all types belonging to a specific category
+  const getTypesForCategory = (catName: string): string[] => {
+    const targetCatLower = (catName || '').trim().toLowerCase();
+    const targetCatId = allCategories.find((c) => c.name.trim().toLowerCase() === targetCatLower)?.id;
 
-    if (selectedCategory === 'all') {
-      return allDistinctTypes;
-    }
-
-    const targetCatLower = selectedCategory.trim().toLowerCase();
-    const targetCatId = categories.find((c) => c.name.trim().toLowerCase() === targetCatLower)?.id;
-
-    // Filter types belonging to the selected category
-    const matchingFromList = woodTypesList
+    const fromList = allWoodTypes
       .filter((wt) => wt.category_id === targetCatId)
       .map((wt) => wt.name.trim());
 
-    // Also include any types from products whose category matches
-    const matchingFromProducts = products
+    const fromProducts = products
       .filter((p) => {
         const pCat = (p.category || '').trim().toLowerCase();
         const derived = woodTypeToCategoryName.get((p.wood_type || '').trim().toLowerCase())?.toLowerCase();
@@ -136,8 +162,18 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       })
       .map((p) => p.wood_type.trim());
 
-    return Array.from(new Set([...matchingFromList, ...matchingFromProducts])).filter(Boolean);
-  }, [products, selectedCategory, categories, woodTypesList, woodTypeToCategoryName]);
+    return Array.from(new Set([...fromList, ...fromProducts])).filter(Boolean);
+  };
+
+  // Context-aware wood types for the filter bar
+  const availableFilterWoodTypes = useMemo(() => {
+    const allDistinct = Array.from(new Set(allWoodTypes.map((t) => t.name.trim()))).filter(Boolean);
+    if (selectedCategory === 'all') {
+      return allDistinct;
+    }
+    const catTypes = getTypesForCategory(selectedCategory);
+    return catTypes.length > 0 ? catTypes : allDistinct;
+  }, [selectedCategory, allWoodTypes, allCategories, products, woodTypeToCategoryName]);
 
   // Handler for category filter change (context-aware: reset type filter if no longer valid)
   const handleCategoryFilterChange = (newCat: string) => {
@@ -146,29 +182,16 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       setSelectedWoodType('all');
       return;
     }
-    const targetCatLower = newCat.trim().toLowerCase();
-    const targetCatId = categories.find((c) => c.name.trim().toLowerCase() === targetCatLower)?.id;
-    const allowedTypes = new Set(
-      woodTypesList
-        .filter((wt) => wt.category_id === targetCatId)
-        .map((wt) => wt.name.trim().toLowerCase())
-    );
-
-    if (selectedWoodType !== 'all' && !allowedTypes.has(selectedWoodType.trim().toLowerCase())) {
+    const allowedTypes = new Set(getTypesForCategory(newCat).map((t) => t.trim().toLowerCase()));
+    if (selectedWoodType !== 'all' && allowedTypes.size > 0 && !allowedTypes.has(selectedWoodType.trim().toLowerCase())) {
       setSelectedWoodType('all');
     }
   };
 
   // Distinct category options for the filter bar
   const categoryFilterOptions = useMemo(() => {
-    const catNames = new Set(categories.map((c) => c.name));
-    for (const p of products) {
-      if (p.category && p.category !== 'ألواح أخشاب') {
-        catNames.add(p.category);
-      }
-    }
-    return Array.from(catNames).filter(Boolean);
-  }, [categories, products]);
+    return allCategories.map((c) => c.name);
+  }, [allCategories]);
 
   // Catalog overall metrics
   const catalogStats = useMemo(() => {
@@ -190,7 +213,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   }, [products]);
 
   // Form state for add / edit product
-  const defaultCategory = categories.length > 0 ? categories[0].name : 'MDF';
+  const defaultCategory = allCategories.length > 0 ? allCategories[0].name : 'MDF';
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -206,41 +229,43 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     purchasing_price: '',
   });
 
-  // Context-aware wood types for the modal form based on formData.category
-  const contextualTypesForForm = useMemo(() => {
-    const targetCatLower = (formData.category || '').trim().toLowerCase();
-    const targetCatId = categories.find((c) => c.name.trim().toLowerCase() === targetCatLower)?.id;
+  // Types matching the selected category
+  const matchingCategoryTypes = useMemo(() => {
+    return getTypesForCategory(formData.category);
+  }, [formData.category, allCategories, allWoodTypes, products, woodTypeToCategoryName]);
 
-    const fromList = woodTypesList
-      .filter((wt) => wt.category_id === targetCatId)
-      .map((wt) => wt.name.trim());
+  // All distinct types in system
+  const allDistinctTypes = useMemo(() => {
+    const set = new Set<string>();
+    for (const wt of allWoodTypes) set.add(wt.name.trim());
+    for (const p of products) if (p.wood_type) set.add(p.wood_type.trim());
+    return Array.from(set).filter(Boolean);
+  }, [allWoodTypes, products]);
 
-    const fromProducts = products
-      .filter((p) => {
-        const pCat = (p.category || '').trim().toLowerCase();
-        const derived = woodTypeToCategoryName.get((p.wood_type || '').trim().toLowerCase())?.toLowerCase();
-        return pCat === targetCatLower || derived === targetCatLower;
-      })
-      .map((p) => p.wood_type.trim());
-
-    const combined = Array.from(new Set([...fromList, ...fromProducts])).filter(Boolean);
-    return combined.length > 0 ? combined : [formData.wood_type || 'MDF N.L'];
-  }, [formData.category, categories, woodTypesList, products, woodTypeToCategoryName, formData.wood_type]);
+  // Other types not in the current category
+  const otherCategoryTypes = useMemo(() => {
+    const matchingSet = new Set(matchingCategoryTypes.map((t) => t.toLowerCase()));
+    return allDistinctTypes.filter((t) => !matchingSet.has(t.toLowerCase()));
+  }, [matchingCategoryTypes, allDistinctTypes]);
 
   const handleCategoryChangeInForm = (newCat: string) => {
-    const targetCatLower = newCat.trim().toLowerCase();
-    const targetCatId = categories.find((c) => c.name.trim().toLowerCase() === targetCatLower)?.id;
-    const catTypes = woodTypesList
-      .filter((wt) => wt.category_id === targetCatId)
-      .map((wt) => wt.name.trim());
-
+    const catTypes = getTypesForCategory(newCat);
     const nextType = catTypes.length > 0 ? catTypes[0] : formData.wood_type;
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       category: newCat,
       wood_type: nextType,
-    });
+    }));
     setIsCustomTypeInput(false);
+  };
+
+  const handleWoodTypeChangeInForm = (newType: string) => {
+    const detectedCat = woodTypeToCategoryName.get(newType.trim().toLowerCase());
+    setFormData((prev) => ({
+      ...prev,
+      wood_type: newType,
+      category: detectedCat || prev.category,
+    }));
   };
 
   const getStockStatus = (p: Product): Exclude<StockStatusFilter, 'all'> => {
@@ -479,13 +504,14 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             onClick={() => {
               setEditingProduct(null);
               const today = new Date().toISOString().slice(0, 10);
-              const cat = categories.length > 0 ? categories[0].name : 'MDF';
-              const firstType = contextualTypesForForm.length > 0 ? contextualTypesForForm[0] : 'MDF N.L';
+              const initialCat = allCategories.length > 0 ? allCategories[0].name : 'MDF';
+              const initialCatTypes = getTypesForCategory(initialCat);
+              const initialType = initialCatTypes.length > 0 ? initialCatTypes[0] : (allWoodTypes[0]?.name || 'MDF N.L');
               setFormData({
                 code: '',
                 name: '',
-                category: cat,
-                wood_type: firstType,
+                category: initialCat,
+                wood_type: initialType,
                 size: '',
                 color: '',
                 received_date: today,
@@ -832,9 +858,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       {/* ========================================================================= */}
       {/* Modal: Add / Edit Product with Context-Aware Category & Type */}
       {/* ========================================================================= */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
-          <div className="bg-[#0e1424] border border-slate-800 rounded-xl max-w-lg w-full p-5 space-y-4 shadow-2xl relative">
+      {isAddModalOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <div className="bg-[#0e1424] border border-slate-700/90 rounded-xl max-w-lg w-full p-5 space-y-4 shadow-2xl relative my-auto max-h-[92vh] overflow-y-auto text-slate-100">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                 <Trees className="w-4 h-4 text-amber-400" />
@@ -891,12 +917,12 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     onChange={(e) => handleCategoryChangeInForm(e.target.value)}
                     className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-semibold text-amber-300 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                   >
-                    {categories.map((c) => (
+                    {allCategories.map((c) => (
                       <option key={c.id} value={c.name}>
                         {c.name}
                       </option>
                     ))}
-                    {!categories.some((c) => c.name === formData.category) && formData.category && (
+                    {!allCategories.some((c) => c.name === formData.category) && formData.category && (
                       <option value={formData.category}>{formData.category}</option>
                     )}
                   </select>
@@ -928,14 +954,38 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     <select
                       required
                       value={formData.wood_type}
-                      onChange={(e) => setFormData({ ...formData, wood_type: e.target.value })}
+                      onChange={(e) => handleWoodTypeChangeInForm(e.target.value)}
                       className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-medium text-slate-100 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                     >
-                      {contextualTypesForForm.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
+                      {matchingCategoryTypes.length > 0 ? (
+                        <>
+                          <optgroup label={`أنواع تابعة لـ ${formData.category}`}>
+                            {matchingCategoryTypes.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </optgroup>
+                          {otherCategoryTypes.length > 0 && (
+                            <optgroup label="باقي أنواع الخشب المتاحة">
+                              {otherCategoryTypes.map((t) => (
+                                <option key={t} value={t}>
+                                  {t}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </>
+                      ) : (
+                        allDistinctTypes.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))
+                      )}
+                      {!allDistinctTypes.some((t) => t.toLowerCase() === (formData.wood_type || '').toLowerCase()) && formData.wood_type && (
+                        <option value={formData.wood_type}>{formData.wood_type}</option>
+                      )}
                     </select>
                   )}
                 </div>
@@ -1044,12 +1094,13 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Product Details Drawer */}
-      {detailsProduct && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/70 backdrop-blur-xs">
+      {detailsProduct && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex justify-end bg-slate-950/70 backdrop-blur-xs" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <div className="w-full max-w-md bg-[#0e1424] border-l rtl:border-l-0 rtl:border-r border-slate-800 h-full flex flex-col shadow-2xl overflow-y-auto">
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -1156,7 +1207,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Bulk Price Update Modal */}

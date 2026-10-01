@@ -502,7 +502,7 @@ export const ReturnsPage: React.FC<ReturnsPageProps> = ({
                             onClick={() =>
                               setSelectedInvoiceForView({
                                 invoice: item,
-                                type: activeSubTab,
+                                type: activeSubTab === 'sales' ? 'sales' : 'purchase',
                               })
                             }
                             className="p-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-amber-400 border border-slate-700/60 transition"
@@ -513,7 +513,7 @@ export const ReturnsPage: React.FC<ReturnsPageProps> = ({
                           <button
                             onClick={async () => {
                               if (window.confirm('هل أنت متأكد من حذف هذا المرتجع؟')) {
-                                await onDeleteInvoice(item.id, activeSubTab);
+                                await onDeleteInvoice(item.id, activeSubTab === 'sales' ? 'sales' : 'purchase');
                               }
                             }}
                             className="p-1.5 rounded-md bg-slate-900 hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 border border-slate-700/60 transition"
