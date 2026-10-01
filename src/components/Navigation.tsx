@@ -15,11 +15,13 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  FolderTree,
 } from 'lucide-react';
 
 export type NavTab =
   | 'dashboard'
   | 'products'
+  | 'categories'
   | 'warehouses'
   | 'sales'
   | 'purchases'
@@ -69,6 +71,12 @@ export const Navigation: React.FC<NavigationProps> = ({
           labelAr: 'كتالوج الألواح الخشبية',
           labelEn: 'Wood Sheets Catalog',
           icon: Trees,
+        },
+        {
+          id: 'categories' as NavTab,
+          labelAr: 'التصنيفات وهيكل الأخشاب',
+          labelEn: 'Categories & Types',
+          icon: FolderTree,
         },
         {
           id: 'warehouses' as NavTab,

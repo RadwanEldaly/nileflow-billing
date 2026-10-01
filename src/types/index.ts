@@ -40,12 +40,31 @@ export interface Supplier {
   updated_at: string;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WoodType {
+  id: string;
+  name: string;
+  category_id: string | null;
+  category_name?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Product {
   id: string;
   code: string;
   name: string;
-  wood_type: string; // MDF, Counter (كونتر), Plywood (أبلكاش), Beech (زان), Pine (موسكي), etc.
-  category?: string;
+  wood_type: string; // Type (النوع الفرعي المحدد، مثل: MDF N.L, كونتر LG)
+  category?: string; // Category name (التصنيف الأب، مثل: MDF, كونتر)
+  category_id?: string; // Optional direct foreign key to Category
+  type_id?: string; // Optional direct foreign key to WoodType
   size?: string;
   color?: string;
   purchase_price: number;

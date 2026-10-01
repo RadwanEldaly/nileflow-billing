@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Product, Supplier, StockMovement } from '../types';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Product, Supplier, StockMovement, Category, WoodType } from '../types';
 import {
   Search,
   Plus,
@@ -19,24 +19,29 @@ import {
   Boxes,
   Clock,
   History,
+  FolderTree,
+  Tag,
 } from 'lucide-react';
 import { BulkPriceUpdateModal } from '../components/BulkPriceUpdateModal';
 
 interface ProductsPageProps {
   products: Product[];
+  categories?: Category[];
+  woodTypesList?: WoodType[];
   suppliers: Supplier[];
   movements: StockMovement[];
   language: 'ar' | 'en';
+  initialCategoryFilter?: string;
+  initialTypeFilter?: string;
   onAddProduct: (product: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => void;
   onUpdateProduct: (id: string, updates: Partial<Product>) => void;
   onDeleteProduct: (id: string) => void;
   onNavigateToImport: () => void;
   onRefreshProducts?: () => void;
+  onNavigateToCategories?: () => void;
 }
 
-// Reused everywhere in the app as the "low stock" line (see the existing
-// isLowStock check further down) — kept here as a single named fallback so it's
-// easy to change later if a product doesn't have its own min_stock_level.
+// Reused everywhere in the app as the "low stock" line
 const DEFAULT_LOW_STOCK_THRESHOLD = 10;
 
 type StockStatusFilter = 'all' | 'available' | 'low' | 'out';
@@ -53,17 +58,23 @@ const MOVEMENT_TYPE_LABELS_AR: Record<StockMovement['movement_type'], string> = 
 
 export const ProductsPage: React.FC<ProductsPageProps> = ({
   products,
+  categories = [],
+  woodTypesList = [],
   suppliers,
   movements,
   language,
+  initialCategoryFilter = 'all',
+  initialTypeFilter = 'all',
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
   onNavigateToImport,
   onRefreshProducts,
+  onNavigateToCategories,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedWoodType, setSelectedWoodType] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategoryFilter);
+  const [selectedWoodType, setSelectedWoodType] = useState<string>(initialTypeFilter);
   const [stockStatusFilter, setStockStatusFilter] = useState<StockStatusFilter>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -76,10 +87,90 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   const [openMenuRowId, setOpenMenuRowId] = useState<string | null>(null);
   const [detailsProduct, setDetailsProduct] = useState<Product | null>(null);
 
-  // ==================================================
-  // PHASE 1 — Inventory summary (always computed from the FULL catalog,
-  // never from filteredProducts, so it stays meaningful while searching/filtering)
-  // ==================================================
+  // Toggle for adding custom wood type in the modal if not in list
+  const [isCustomTypeInput, setIsCustomTypeInput] = useState(false);
+
+  // Sync initial filter props if changed from navigation
+  useEffect(() => {
+    if (initialCategoryFilter) setSelectedCategory(initialCategoryFilter);
+    if (initialTypeFilter) setSelectedWoodType(initialTypeFilter);
+  }, [initialCategoryFilter, initialTypeFilter]);
+
+  // Fast mapping from type name to parent category name
+  const woodTypeToCategoryName = useMemo(() => {
+    const map = new Map<string, string>();
+    const catIdToName = new Map<string, string>();
+    for (const c of categories) {
+      catIdToName.set(c.id, c.name);
+    }
+    for (const wt of woodTypesList) {
+      if (wt.category_id && catIdToName.has(wt.category_id)) {
+        map.set(wt.name.trim().toLowerCase(), catIdToName.get(wt.category_id)!);
+      }
+    }
+    return map;
+  }, [categories, woodTypesList]);
+
+  // Context-aware wood types for the filter bar
+  const availableFilterWoodTypes = useMemo(() => {
+    const allDistinctTypes = Array.from(new Set(products.map((p) => (p.wood_type || '').trim()).filter(Boolean)));
+
+    if (selectedCategory === 'all') {
+      return allDistinctTypes;
+    }
+
+    const targetCatLower = selectedCategory.trim().toLowerCase();
+    const targetCatId = categories.find((c) => c.name.trim().toLowerCase() === targetCatLower)?.id;
+
+    // Filter types belonging to the selected category
+    const matchingFromList = woodTypesList
+      .filter((wt) => wt.category_id === targetCatId)
+      .map((wt) => wt.name.trim());
+
+    // Also include any types from products whose category matches
+    const matchingFromProducts = products
+      .filter((p) => {
+        const pCat = (p.category || '').trim().toLowerCase();
+        const derived = woodTypeToCategoryName.get((p.wood_type || '').trim().toLowerCase())?.toLowerCase();
+        return pCat === targetCatLower || derived === targetCatLower;
+      })
+      .map((p) => p.wood_type.trim());
+
+    return Array.from(new Set([...matchingFromList, ...matchingFromProducts])).filter(Boolean);
+  }, [products, selectedCategory, categories, woodTypesList, woodTypeToCategoryName]);
+
+  // Handler for category filter change (context-aware: reset type filter if no longer valid)
+  const handleCategoryFilterChange = (newCat: string) => {
+    setSelectedCategory(newCat);
+    if (newCat === 'all') {
+      setSelectedWoodType('all');
+      return;
+    }
+    const targetCatLower = newCat.trim().toLowerCase();
+    const targetCatId = categories.find((c) => c.name.trim().toLowerCase() === targetCatLower)?.id;
+    const allowedTypes = new Set(
+      woodTypesList
+        .filter((wt) => wt.category_id === targetCatId)
+        .map((wt) => wt.name.trim().toLowerCase())
+    );
+
+    if (selectedWoodType !== 'all' && !allowedTypes.has(selectedWoodType.trim().toLowerCase())) {
+      setSelectedWoodType('all');
+    }
+  };
+
+  // Distinct category options for the filter bar
+  const categoryFilterOptions = useMemo(() => {
+    const catNames = new Set(categories.map((c) => c.name));
+    for (const p of products) {
+      if (p.category && p.category !== 'ألواح أخشاب') {
+        catNames.add(p.category);
+      }
+    }
+    return Array.from(catNames).filter(Boolean);
+  }, [categories, products]);
+
+  // Catalog overall metrics
   const catalogStats = useMemo(() => {
     let totalStock = 0;
     let stockValue = 0;
@@ -98,14 +189,15 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     };
   }, [products]);
 
-  // واجهة نظيفة تماماً كما طلبت
+  // Form state for add / edit product
+  const defaultCategory = categories.length > 0 ? categories[0].name : 'MDF';
   const [formData, setFormData] = useState({
     code: '',
     name: '',
-    wood_type: 'MDF',
+    category: defaultCategory,
+    wood_type: 'MDF N.L',
     size: '',
     color: '',
-    category: 'ألواح أخشاب',
     received_date: new Date().toISOString().slice(0, 10),
     selling_price: '',
     stock_quantity: '',
@@ -114,11 +206,43 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     purchasing_price: '',
   });
 
-  const woodTypes = Array.from(new Set(products.map((p) => p.wood_type).filter(Boolean)));
+  // Context-aware wood types for the modal form based on formData.category
+  const contextualTypesForForm = useMemo(() => {
+    const targetCatLower = (formData.category || '').trim().toLowerCase();
+    const targetCatId = categories.find((c) => c.name.trim().toLowerCase() === targetCatLower)?.id;
 
-  // PHASE 2 — stock status check, reusing each product's own min_stock_level
-  // (the threshold already used for the red "isLowStock" badge in the table)
-  // instead of inventing a separate global setting.
+    const fromList = woodTypesList
+      .filter((wt) => wt.category_id === targetCatId)
+      .map((wt) => wt.name.trim());
+
+    const fromProducts = products
+      .filter((p) => {
+        const pCat = (p.category || '').trim().toLowerCase();
+        const derived = woodTypeToCategoryName.get((p.wood_type || '').trim().toLowerCase())?.toLowerCase();
+        return pCat === targetCatLower || derived === targetCatLower;
+      })
+      .map((p) => p.wood_type.trim());
+
+    const combined = Array.from(new Set([...fromList, ...fromProducts])).filter(Boolean);
+    return combined.length > 0 ? combined : [formData.wood_type || 'MDF N.L'];
+  }, [formData.category, categories, woodTypesList, products, woodTypeToCategoryName, formData.wood_type]);
+
+  const handleCategoryChangeInForm = (newCat: string) => {
+    const targetCatLower = newCat.trim().toLowerCase();
+    const targetCatId = categories.find((c) => c.name.trim().toLowerCase() === targetCatLower)?.id;
+    const catTypes = woodTypesList
+      .filter((wt) => wt.category_id === targetCatId)
+      .map((wt) => wt.name.trim());
+
+    const nextType = catTypes.length > 0 ? catTypes[0] : formData.wood_type;
+    setFormData({
+      ...formData,
+      category: newCat,
+      wood_type: nextType,
+    });
+    setIsCustomTypeInput(false);
+  };
+
   const getStockStatus = (p: Product): Exclude<StockStatusFilter, 'all'> => {
     const threshold = p.min_stock_level ?? DEFAULT_LOW_STOCK_THRESHOLD;
     if (p.stock_quantity <= 0) return 'out';
@@ -126,17 +250,47 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     return 'available';
   };
 
-  const filteredProducts = products.filter((p) => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.wood_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.size || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.color || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesWood = selectedWoodType === 'all' || p.wood_type === selectedWoodType;
-    const matchesStock = stockStatusFilter === 'all' || getStockStatus(p) === stockStatusFilter;
-    return matchesSearch && matchesWood && matchesStock;
-  });
+  // Memoized, high-performance product filtering
+  const filteredProducts = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return products.filter((p) => {
+      // 1. Search filter
+      if (term) {
+        const matchesSearch =
+          p.name.toLowerCase().includes(term) ||
+          p.code.toLowerCase().includes(term) ||
+          p.wood_type.toLowerCase().includes(term) ||
+          (p.category || '').toLowerCase().includes(term) ||
+          (p.size || '').toLowerCase().includes(term) ||
+          (p.color || '').toLowerCase().includes(term);
+        if (!matchesSearch) return false;
+      }
+
+      // 2. Category filter
+      if (selectedCategory !== 'all') {
+        const pCat = p.category ? p.category.trim().toLowerCase() : '';
+        const derivedCat = woodTypeToCategoryName.get((p.wood_type || '').trim().toLowerCase())?.toLowerCase() || '';
+        const targetCat = selectedCategory.trim().toLowerCase();
+        if (pCat !== targetCat && derivedCat !== targetCat) {
+          return false;
+        }
+      }
+
+      // 3. Type filter
+      if (selectedWoodType !== 'all') {
+        if ((p.wood_type || '').trim().toLowerCase() !== selectedWoodType.trim().toLowerCase()) {
+          return false;
+        }
+      }
+
+      // 4. Stock status filter
+      if (stockStatusFilter !== 'all' && getStockStatus(p) !== stockStatusFilter) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [products, searchTerm, selectedCategory, selectedWoodType, stockStatusFilter, woodTypeToCategoryName]);
 
   // Bulk selection handlers
   const toggleSelectAll = () => {
@@ -158,15 +312,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   };
 
   const selectedProducts = products.filter((p) => selectedProductIds.has(p.id));
-  const selectedWoodTypeForBulk = selectedProducts.length > 0 
-    ? selectedProducts[0].wood_type 
-    : '';
+  const selectedWoodTypeForBulk = selectedProducts.length > 0 ? selectedProducts[0].wood_type : '';
   const allSelectedSameWoodType = selectedProducts.every((p) => p.wood_type === selectedWoodTypeForBulk);
 
-  // Selection safety: selection is intentionally kept across filter changes (so switching
-  // filters doesn't silently lose a bulk selection), but that means a selected product can
-  // become hidden by the current search/wood-type/stock filter. Surface that clearly instead
-  // of silently including invisible rows in the bulk price update.
   const visibleSelectedCount = filteredProducts.filter((p) => selectedProductIds.has(p.id)).length;
   const hiddenSelectedCount = selectedProductIds.size - visibleSelectedCount;
 
@@ -177,13 +325,11 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     const minStock = parseFloat(formData.min_stock_level) || 10;
 
     if (!formData.name || sPrice <= 0) {
-      alert("يرجى التأكد من إدخال اسم المنتج وسعر البيع.");
+      alert(language === 'ar' ? 'يرجى التأكد من إدخال اسم المنتج وسعر البيع.' : 'Please enter product name and selling price.');
       return;
     }
 
     if (editingProduct) {
-      // تنظيف الحقول عند التحديث لتجنب إرسال نصوص فارغة
-      // ملاحظة: received_date مش موجود في جدول products على Supabase — بنعتمد على created_at
       const updates: Partial<Product> = {
         code: formData.code || editingProduct.code,
         name: formData.name,
@@ -199,9 +345,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       onUpdateProduct(editingProduct.id, updates);
       setEditingProduct(null);
     } else {
-      // توليد كود فريد لمنع خطأ التكرار في قاعدة البيانات
       const generatedCode = formData.code || `WOOD-${Math.floor(1000 + Math.random() * 9000)}`;
-      // مابنتبعتش received_date لأن العمود مش موجود في الـ DB — created_at بيتسجل تلقائياً
       const newProd: Omit<Product, 'id' | 'created_at' | 'updated_at'> = {
         code: generatedCode,
         name: formData.name,
@@ -222,10 +366,10 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     setFormData({
       code: '',
       name: '',
-      wood_type: 'MDF',
+      category: defaultCategory,
+      wood_type: 'MDF N.L',
       size: '',
       color: '',
-      category: 'ألواح أخشاب',
       received_date: new Date().toISOString().slice(0, 10),
       selling_price: '',
       stock_quantity: '',
@@ -233,18 +377,26 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       notes: '',
       purchasing_price: '',
     });
+    setIsCustomTypeInput(false);
     setIsAddModalOpen(false);
   };
 
   const handleEditClick = (prod: Product) => {
     setEditingProduct(prod);
+
+    // Determine safe parent category
+    let safeCat = prod.category;
+    if (!safeCat || safeCat === 'ألواح أخشاب') {
+      safeCat = woodTypeToCategoryName.get((prod.wood_type || '').trim().toLowerCase()) || defaultCategory;
+    }
+
     setFormData({
       code: prod.code,
       name: prod.name,
       wood_type: prod.wood_type,
+      category: safeCat,
       size: prod.size || '',
       color: prod.color || '',
-      category: prod.category || 'ألواح أخشاب',
       received_date: prod.received_date || '',
       selling_price: String(prod.selling_price),
       stock_quantity: String(prod.stock_quantity),
@@ -252,94 +404,62 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       notes: prod.notes || '',
       purchasing_price: String(prod.purchase_price),
     });
+    setIsCustomTypeInput(false);
     setIsAddModalOpen(true);
   };
 
   const handleDeleteClick = (prod: Product) => {
     const confirmed = window.confirm(
-      `متأكد إنك عايز تمسح "${prod.name}" نهائيًا؟ الحذف ده مش هينفع ترجع فيه.`
+      language === 'ar'
+        ? `متأكد إنك تريد مسح "${prod.name}" نهائيًا؟ هذا الإجراء لا يمكن التراجع عنه.`
+        : `Are you sure you want to permanently delete "${prod.name}"?`
     );
     if (confirmed) {
       onDeleteProduct(prod.id);
-      // Remove from selection if deleted
-      setSelectedProductIds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(prod.id);
-        return newSet;
-      });
     }
   };
 
-  const handleBulkPriceUpdateSuccess = () => {
-    // Clear selection after successful update
-    setSelectedProductIds(new Set());
-    setIsBulkPriceModalOpen(false);
-    onRefreshProducts?.();
-  };
-
-  // Row menu actions
-  const handleOpenDetails = (p: Product) => {
-    setDetailsProduct(p);
+  const handleOpenRowDetails = (prod: Product) => {
+    setDetailsProduct(prod);
     setOpenMenuRowId(null);
   };
-  const handleEditPriceClick = (p: Product) => {
-    setSelectedProductIds(new Set([p.id]));
-    setIsBulkPriceModalOpen(true);
-    setOpenMenuRowId(null);
-  };
-
-  // ==================================================
-  // PHASE 3 — movement history for the details drawer.
-  // `movements` (from stock_movements) is already loaded once at app start,
-  // so filtering it here is a plain in-memory operation, not a new fetch.
-  // The stock_movements table only stores each movement's own +/- quantity,
-  // not a running "balance after" snapshot, so we derive it by walking
-  // backwards from the product's current stock_quantity. This assumes stock
-  // wasn't changed by anything other than logged movements (e.g. a direct
-  // manual edit of "رصيد الألواح" in the edit form bypasses the movement log) —
-  // see the implementation notes at the end of this task for details.
-  const productMovements = useMemo(() => {
-    if (!detailsProduct) return [];
-    const rows = movements
-      .filter((m) => m.product_id === detailsProduct.id)
-      .slice()
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()); // oldest -> newest
-
-    let runningBalance = detailsProduct.stock_quantity || 0;
-    const withBalance = rows.map((m) => ({ movement: m, balanceAfter: 0 }));
-    // Walk from the newest movement backwards: balance_after[newest] = current stock,
-    // balance_after[i-1] = balance_after[i] - quantity[i]
-    for (let i = withBalance.length - 1; i >= 0; i--) {
-      withBalance[i].balanceAfter = runningBalance;
-      runningBalance -= withBalance[i].movement.quantity;
-    }
-    return withBalance.reverse(); // newest first for display
-  }, [movements, detailsProduct]);
 
   return (
     <div className="space-y-4">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Top Header Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-slate-800">
         <div>
           <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
             <Trees className="w-5 h-5 text-amber-400" />
-            <span>{language === 'ar' ? 'كتالوج الألواح الخشبية' : 'Wooden Sheet Catalog'}</span>
+            <span>{language === 'ar' ? 'كتالوج وإدارة الألواح الخشبية' : 'Wood Sheets Catalog'}</span>
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
             {language === 'ar'
-              ? 'إدارة ألواح الـ MDF، الكونتر، الأبلكاش، والزان - بحساب عدد الألواح وأسعار الشراء والبيع'
-              : 'Manage MDF, Counter, Plywood, and hardwood sheet stock & prices.'}
+              ? 'إدارة أصناف الألواح الخشبية، الأسعار، وتصنيف الأخشاب الهرمي'
+              : 'Manage wooden sheet products, pricing, and hierarchical classifications.'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {onNavigateToCategories && (
+            <button
+              onClick={onNavigateToCategories}
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700 font-medium text-xs px-3.5 py-2 rounded-md shadow-xs transition active:scale-[0.99]"
+              title={language === 'ar' ? 'إدارة الهيكل الهرمي للتصنيفات والأنواع' : 'Manage Categories & Types'}
+            >
+              <FolderTree className="w-3.5 h-3.5 text-amber-400" />
+              <span>{language === 'ar' ? 'التصنيفات والأنواع' : 'Categories & Types'}</span>
+            </button>
+          )}
+
           <button
             onClick={onNavigateToImport}
-            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-850 text-slate-200 border border-slate-700/80 font-medium text-xs px-3 py-2 rounded-md transition shadow-xs"
+            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-850 text-slate-200 border border-slate-700/80 font-medium text-xs px-3.5 py-2 rounded-md transition shadow-xs"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
             <span>{language === 'ar' ? 'استيراد إكسيل' : 'Import Excel'}</span>
           </button>
-          
+
           {/* Bulk Price Update Button */}
           {selectedProductIds.size > 0 && allSelectedSameWoodType && (
             <button
@@ -347,21 +467,27 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
               className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-850 text-amber-300 border border-amber-500/40 font-medium text-xs px-3 py-2 rounded-md transition shadow-xs"
             >
               <Banknote className="w-3.5 h-3.5 text-amber-400" />
-              <span>{language === 'ar' ? `تحديث أسعار (${selectedProductIds.size})` : `Update Prices (${selectedProductIds.size})`}</span>
+              <span>
+                {language === 'ar'
+                  ? `تحديث أسعار (${selectedProductIds.size})`
+                  : `Update Prices (${selectedProductIds.size})`}
+              </span>
             </button>
           )}
-          
+
           <button
             onClick={() => {
               setEditingProduct(null);
               const today = new Date().toISOString().slice(0, 10);
+              const cat = categories.length > 0 ? categories[0].name : 'MDF';
+              const firstType = contextualTypesForForm.length > 0 ? contextualTypesForForm[0] : 'MDF N.L';
               setFormData({
                 code: '',
                 name: '',
-                wood_type: 'MDF',
+                category: cat,
+                wood_type: firstType,
                 size: '',
                 color: '',
-                category: 'ألواح أخشاب',
                 received_date: today,
                 selling_price: '',
                 stock_quantity: '',
@@ -369,6 +495,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                 notes: '',
                 purchasing_price: '',
               });
+              setIsCustomTypeInput(false);
               setIsAddModalOpen(true);
             }}
             className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs px-3.5 py-2 rounded-md shadow-xs transition active:scale-[0.99]"
@@ -404,7 +531,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
               {language === 'ar' ? 'إجمالي المخزون' : 'Total Stock'}
             </div>
             <div className="text-lg font-bold font-mono text-slate-100 leading-tight tabular-nums">
-              {catalogStats.totalStock.toLocaleString()} <span className="text-xs font-normal text-slate-400">{language === 'ar' ? 'لوح' : 'sheets'}</span>
+              {catalogStats.totalStock.toLocaleString()}{' '}
+              <span className="text-xs font-normal text-slate-400">{language === 'ar' ? 'لوح' : 'sheets'}</span>
             </div>
           </div>
         </div>
@@ -418,13 +546,14 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
               {language === 'ar' ? 'قيمة المخزون' : 'Stock Value'}
             </div>
             <div className="text-lg font-bold font-mono text-slate-100 leading-tight tabular-nums">
-              {catalogStats.stockValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs font-normal text-slate-400">EGP</span>
+              {catalogStats.stockValue.toLocaleString()}{' '}
+              <span className="text-xs font-normal text-slate-400">{language === 'ar' ? 'ج.م' : 'EGP'}</span>
             </div>
           </div>
         </div>
 
         <div className="p-3.5 flex items-center gap-3">
-          <div className="p-2 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
+          <div className={`p-2 rounded ${catalogStats.outOfStock > 0 ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-slate-800 text-slate-400'}`}>
             <PackageX className="w-4 h-4" />
           </div>
           <div className="min-w-0">
@@ -449,32 +578,64 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         </div>
       )}
 
-      {/* Search & Filter Controls */}
+      {/* Search & Hierarchical Filter Controls */}
       <div className="bg-[#0e1424] p-3 rounded-lg border border-slate-800 flex flex-col md:flex-row gap-2.5">
         <div className="relative flex-1">
           <Search className="w-3.5 h-3.5 absolute top-3 right-3 text-slate-500 rtl:right-3 ltr:left-3" />
           <input
             type="text"
-            placeholder={language === 'ar' ? 'ابحث باسم اللوح، الكود، أو نوع الخشب (MDF، كونتر، أبلكاش)...' : 'Search sheet name, code, or wood type...'}
+            placeholder={
+              language === 'ar'
+                ? 'ابحث باسم اللوح، الكود، التصنيف، أو نوع الخشب (MDF، كونتر، 5 بلاي)...'
+                : 'Search sheet name, code, category, or wood type...'
+            }
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-3 pr-9 rtl:pr-9 rtl:pl-3 ltr:pl-9 ltr:pr-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
           />
         </div>
-        {woodTypes.length > 0 && (
+
+        {/* 1. Category Filter Dropdown (التصنيف الرئيسي) */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap hidden sm:inline">
+            {language === 'ar' ? 'التصنيف:' : 'Category:'}
+          </span>
+          <select
+            value={selectedCategory}
+            onChange={(e) => handleCategoryFilterChange(e.target.value)}
+            className="bg-slate-950 border border-slate-700/80 rounded-md text-xs text-amber-300 px-3 py-1.5 font-semibold focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+          >
+            <option value="all">{language === 'ar' ? 'كل التصنيفات' : 'All Categories'}</option>
+            {categoryFilterOptions.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 2. Context-Aware Wood Type Filter Dropdown (النوع الفرعي التابع) */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap hidden sm:inline">
+            {language === 'ar' ? 'النوع:' : 'Type:'}
+          </span>
           <select
             value={selectedWoodType}
             onChange={(e) => setSelectedWoodType(e.target.value)}
             className="bg-slate-950 border border-slate-700/80 rounded-md text-xs text-slate-200 px-3 py-1.5 font-medium focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
           >
-            <option value="all">{language === 'ar' ? 'جميع أنواع الأخشاب' : 'All Wood Types'}</option>
-            {woodTypes.map((w) => (
+            <option value="all">
+              {selectedCategory === 'all'
+                ? language === 'ar' ? 'جميع أنواع الأخشاب' : 'All Wood Types'
+                : language === 'ar' ? `كل أنواع ${selectedCategory}` : `All ${selectedCategory} Types`}
+            </option>
+            {availableFilterWoodTypes.map((w) => (
               <option key={w} value={w}>
                 {w}
               </option>
             ))}
           </select>
-        )}
+        </div>
 
         {/* Stock status filter */}
         <select
@@ -500,32 +661,38 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         </div>
       )}
 
-      {/* Enterprise Catalog Table */}
+      {/* Products Table Container */}
       <div className="bg-[#0e1424] rounded-lg border border-slate-800 overflow-hidden shadow-xs">
-        {filteredProducts.length > 0 ? (
-          <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[320px]">
+          {filteredProducts.length === 0 ? (
+            <div className="p-8 text-center text-slate-500 text-xs">
+              {language === 'ar'
+                ? 'لا توجد أصناف مطابقة لمعايير البحث والتصفية الحالية'
+                : 'No products match the selected filters.'}
+            </div>
+          ) : (
             <table className="w-full text-xs text-right rtl:text-right ltr:text-left">
-              <thead className="bg-[#090d16] text-slate-400 text-[11px] uppercase border-b border-slate-800">
+              <thead className="bg-slate-900/90 text-slate-400 text-[11px] font-semibold border-b border-slate-800">
                 <tr>
                   <th className="px-3.5 py-2.5 w-10 text-center">
                     <button
                       onClick={toggleSelectAll}
-                      className="flex items-center justify-center text-slate-500 hover:text-amber-400 transition"
-                      title={language === 'ar' ? 'تحديد الكل' : 'Select All'}
+                      className="flex items-center justify-center text-slate-400 hover:text-amber-400 transition"
+                      title={language === 'ar' ? 'تحديد كل المعروض' : 'Select all visible'}
                     >
-                      {selectedProductIds.size === filteredProducts.length ? (
+                      {selectedProductIds.size === filteredProducts.length && filteredProducts.length > 0 ? (
                         <CheckSquare className="w-4 h-4 text-amber-400" />
                       ) : (
                         <Square className="w-4 h-4" />
                       )}
                     </button>
                   </th>
-                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'كود اللوح' : 'Code'}</th>
-                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'اسم المنتج / اللوح' : 'Item Name'}</th>
-                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'نوع الخشب' : 'Wood Type'}</th>
+                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'كود اللوح' : 'SKU'}</th>
+                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'اسم اللوح الخشبي' : 'Product Name'}</th>
+                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'التصنيف والنوع' : 'Classification'}</th>
                   <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'المقاس' : 'Size'}</th>
-                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'اللون' : 'Color'}</th>
-                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'تاريخ الإضافة' : 'Date'}</th>
+                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'اللون / الدرجة' : 'Color'}</th>
+                  <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'تاريخ الإضافة' : 'Date Added'}</th>
                   <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'سعر البيع' : 'Selling Price'}</th>
                   <th className="px-3.5 py-2.5 font-semibold">{language === 'ar' ? 'رصيد الألواح' : 'Current Stock'}</th>
                   <th className="px-3.5 py-2.5 text-center font-semibold">{language === 'ar' ? 'إجراءات' : 'Actions'}</th>
@@ -536,6 +703,11 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   const isLowStock = p.stock_quantity <= (p.min_stock_level || 10);
                   const isSelected = selectedProductIds.has(p.id);
                   const isMenuOpen = openMenuRowId === p.id;
+                  const derivedCat =
+                    p.category ||
+                    woodTypeToCategoryName.get((p.wood_type || '').trim().toLowerCase()) ||
+                    '';
+
                   return (
                     <tr key={p.id} className={`hover:bg-slate-850/50 transition ${isSelected ? 'bg-amber-500/5' : ''}`}>
                       <td className="px-3.5 py-2.5 text-center">
@@ -552,11 +724,21 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                       </td>
                       <td className="px-3.5 py-2.5 font-mono text-slate-400 font-medium">{p.code}</td>
                       <td className="px-3.5 py-2.5 font-semibold text-slate-100">{p.name}</td>
+                      
+                      {/* Classification: Category + Wood Type */}
                       <td className="px-3.5 py-2.5">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-200 border border-slate-700/80">
-                          {p.wood_type}
-                        </span>
+                        <div className="flex flex-col gap-0.5 items-start">
+                          {derivedCat && derivedCat !== 'ألواح أخشاب' && (
+                            <span className="text-[10px] font-semibold text-amber-400 leading-tight">
+                              {derivedCat}
+                            </span>
+                          )}
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-200 border border-slate-700/80">
+                            {p.wood_type}
+                          </span>
+                        </div>
                       </td>
+
                       <td className="px-3.5 py-2.5 font-mono text-slate-300">{p.size || '—'}</td>
                       <td className="px-3.5 py-2.5 text-slate-300">{p.color || '—'}</td>
                       <td className="px-3.5 py-2.5 font-mono text-slate-400 text-[11px]">
@@ -572,17 +754,21 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                         {p.selling_price} <span className="text-[10px] text-slate-400 font-normal">EGP</span>
                       </td>
                       <td className="px-3.5 py-2.5">
-                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-mono font-semibold tabular-nums ${
-                          p.stock_quantity === 0
-                            ? 'bg-rose-950/40 text-rose-300 border border-rose-900/60'
-                            : isLowStock
-                            ? 'bg-amber-950/40 text-amber-300 border border-amber-900/60'
-                            : 'text-slate-200'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            p.stock_quantity === 0 ? 'bg-rose-500' : isLowStock ? 'bg-amber-500' : 'bg-emerald-500'
-                          }`} />
-                          {p.stock_quantity} لوح
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-mono font-semibold tabular-nums ${
+                            p.stock_quantity === 0
+                              ? 'bg-rose-950/40 text-rose-300 border border-rose-900/60'
+                              : isLowStock
+                              ? 'bg-amber-950/40 text-amber-300 border border-amber-900/60'
+                              : 'text-slate-200'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              p.stock_quantity === 0 ? 'bg-rose-500' : isLowStock ? 'bg-amber-500' : 'bg-emerald-500'
+                            }`}
+                          />
+                          {p.stock_quantity} {language === 'ar' ? 'لوح' : 'sheets'}
                         </span>
                       </td>
                       <td className="px-3.5 py-2.5 text-center">
@@ -597,43 +783,37 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
 
                           {isMenuOpen && (
                             <>
-                              {/* Backdrop to close on outside click */}
-                              <div className="fixed inset-0 z-40" onClick={() => setOpenMenuRowId(null)} />
-                              <div className="absolute z-50 top-full mt-1 rtl:left-0 ltr:right-0 w-44 bg-slate-900 border border-slate-700/80 rounded-md shadow-xl py-1 text-right rtl:text-right ltr:text-left">
+                              <div
+                                className="fixed inset-0 z-20"
+                                onClick={() => setOpenMenuRowId(null)}
+                              />
+                              <div className="absolute left-0 rtl:left-0 rtl:right-auto ltr:right-0 ltr:left-auto mt-1 w-32 bg-slate-900 border border-slate-700/80 rounded-md shadow-xl z-30 py-1 text-xs">
                                 <button
-                                  onClick={() => handleOpenDetails(p)}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 transition"
+                                  onClick={() => handleOpenRowDetails(p)}
+                                  className="w-full px-3 py-1.5 text-right rtl:text-right ltr:text-left text-slate-200 hover:bg-slate-800 flex items-center gap-2"
                                 >
-                                  <Eye className="w-3.5 h-3.5 text-slate-400" />
-                                  <span>{language === 'ar' ? 'عرض تفاصيل الصنف' : 'View Details'}</span>
+                                  <Eye className="w-3.5 h-3.5 text-blue-400" />
+                                  <span>{language === 'ar' ? 'عرض التفاصيل' : 'Details'}</span>
                                 </button>
                                 <button
                                   onClick={() => {
                                     handleEditClick(p);
                                     setOpenMenuRowId(null);
                                   }}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 transition"
+                                  className="w-full px-3 py-1.5 text-right rtl:text-right ltr:text-left text-slate-200 hover:bg-slate-800 flex items-center gap-2"
                                 >
-                                  <Edit3 className="w-3.5 h-3.5 text-slate-400" />
-                                  <span>{language === 'ar' ? 'تعديل الصنف' : 'Edit Item'}</span>
+                                  <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>{language === 'ar' ? 'تعديل' : 'Edit'}</span>
                                 </button>
-                                <button
-                                  onClick={() => handleEditPriceClick(p)}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 transition"
-                                >
-                                  <Banknote className="w-3.5 h-3.5 text-slate-400" />
-                                  <span>{language === 'ar' ? 'تعديل السعر' : 'Edit Price'}</span>
-                                </button>
-                                <div className="my-1 border-t border-slate-800" />
                                 <button
                                   onClick={() => {
-                                    setOpenMenuRowId(null);
                                     handleDeleteClick(p);
+                                    setOpenMenuRowId(null);
                                   }}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-rose-400 hover:bg-rose-950/30 transition"
+                                  className="w-full px-3 py-1.5 text-right rtl:text-right ltr:text-left text-rose-400 hover:bg-rose-500/10 flex items-center gap-2"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>{language === 'ar' ? 'حذف الصنف' : 'Delete Item'}</span>
+                                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                                  <span>{language === 'ar' ? 'حذف' : 'Delete'}</span>
                                 </button>
                               </div>
                             </>
@@ -645,55 +825,50 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                 })}
               </tbody>
             </table>
-          </div>
-        ) : (
-          <div className="p-10 text-center text-slate-400">
-            <Trees className="w-10 h-10 mx-auto text-slate-600 mb-2.5" />
-            <p className="font-semibold text-xs text-slate-300">
-              {language === 'ar' ? 'لا يوجد أصناف أخشاب مسجلة حالياً' : 'No wooden sheets found'}
-            </p>
-            <p className="text-[11px] text-slate-500 mt-1 max-w-sm mx-auto">
-              {language === 'ar'
-                ? 'قم باستيراد شيت إكسيل يحتوي على أصناف الأخشاب أو أضف صنف لوح جديد يدوياً.'
-                : 'Import Excel file containing wood items or add a new item manually.'}
-            </p>
-            <button
-              onClick={onNavigateToImport}
-              className="mt-3 bg-slate-900 hover:bg-slate-850 text-slate-200 border border-slate-700/80 font-medium text-xs px-3.5 py-2 rounded-md transition"
-            >
-              استيراد أصناف الأخشاب من Excel
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Add / Edit Product Modal */}
+      {/* ========================================================================= */}
+      {/* Modal: Add / Edit Product with Context-Aware Category & Type */}
+      {/* ========================================================================= */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-slate-900 rounded-lg max-w-md w-full p-5 shadow-2xl space-y-4 border border-slate-800">
-            <div className="flex items-center justify-between border-b pb-3 border-slate-800">
-              <h3 className="text-sm font-bold text-slate-100">
-                {editingProduct ? 'تعديل بيانات صنف الخشب' : 'إضافة صنف لوح خشب جديد'}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
+          <div className="bg-[#0e1424] border border-slate-800 rounded-xl max-w-lg w-full p-5 space-y-4 shadow-2xl relative">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <Trees className="w-4 h-4 text-amber-400" />
+                <span>
+                  {editingProduct
+                    ? language === 'ar' ? 'تعديل بيانات اللوح الخشبي' : 'Edit Sheet Product'
+                    : language === 'ar' ? 'إضافة صنف لوح جديد' : 'New Sheet Product'}
+                </span>
               </h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-200">
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="text-slate-400 hover:text-slate-200 transition"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
+
             <form onSubmit={handleSubmitNew} className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
-                  اسم المنتج / اللوح الخشبي *
+                  اسم اللوح الخشبي *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="مثال: لوح MDF أبيض إسباني 18 مم"
+                  placeholder="مثال: N.LAM 5195 أو PVC EV - P.003"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-medium text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2.5">
+
+              {/* Hierarchical Classification Fields: Category -> Type */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">
                     كود الصنف (SKU)
@@ -706,20 +881,66 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-mono text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                   />
                 </div>
+
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">
-                    نوع الخشب *
+                    التصنيف (Category) *
                   </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="MDF / كونتر / أبلكاش"
-                    value={formData.wood_type}
-                    onChange={(e) => setFormData({ ...formData, wood_type: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-medium text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
-                  />
+                  <select
+                    value={formData.category}
+                    onChange={(e) => handleCategoryChangeInForm(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-semibold text-amber-300 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                    {!categories.some((c) => c.name === formData.category) && formData.category && (
+                      <option value={formData.category}>{formData.category}</option>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-medium text-slate-300">
+                      نوع الخشب (Type) *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomTypeInput(!isCustomTypeInput)}
+                      className="text-[10px] text-amber-400 hover:text-amber-300 transition"
+                    >
+                      {isCustomTypeInput ? 'اختيار من القائمة' : '+ نوع جديد'}
+                    </button>
+                  </div>
+                  {isCustomTypeInput ? (
+                    <input
+                      type="text"
+                      required
+                      placeholder="اكتب نوع الخشب..."
+                      value={formData.wood_type}
+                      onChange={(e) => setFormData({ ...formData, wood_type: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-950 border border-amber-500/60 rounded-md text-xs font-medium text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                    />
+                  ) : (
+                    <select
+                      required
+                      value={formData.wood_type}
+                      onChange={(e) => setFormData({ ...formData, wood_type: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-medium text-slate-100 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                    >
+                      {contextualTypesForForm.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">
@@ -746,69 +967,79 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   />
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    تاريخ الإضافة
-                  </label>
-                  <input
-                    type="text"
-                    disabled
-                    value="يُسجَّل تلقائياً عند الحفظ"
-                    className="w-full px-3 py-1.5 bg-slate-950/50 border border-slate-800 rounded-md text-xs text-slate-500 cursor-not-allowed font-mono"
-                  />
-                </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">
                     سعر البيع (للّوح) *
                   </label>
                   <input
                     type="number"
-                    step="0.01"
+                    step="any"
                     required
+                    placeholder="0.00"
                     value={formData.selling_price}
                     onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-mono font-bold text-amber-400 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    رصيد الألواح الحالي
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="0"
+                    value={formData.stock_quantity}
+                    onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-mono text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                   />
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">
-                    {editingProduct ? 'عدد الألواح (قابل للتعديل)' : 'رصيد الألواح الأولي'}
+                    الحد الأدنى للتنبيه
                   </label>
                   <input
                     type="number"
-                    value={formData.stock_quantity}
-                    onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-mono text-slate-100 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                    step="any"
+                    value={formData.min_stock_level}
+                    onChange={(e) => setFormData({ ...formData, min_stock_level: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-mono text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">
-                    حد إعادة الطلب (ألواح)
+                    ملاحظات
                   </label>
                   <input
-                    type="number"
-                    value={formData.min_stock_level}
-                    onChange={(e) => setFormData({ ...formData, min_stock_level: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs font-mono text-slate-100 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                    type="text"
+                    placeholder="ملاحظات اختيارية..."
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-md text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-3.5 py-1.5 rounded-md text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md text-xs font-medium transition"
                 >
-                  إلغاء
+                  {language === 'ar' ? 'إلغاء' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
-                  className="px-3.5 py-1.5 rounded-md text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 transition active:scale-[0.99]"
+                  className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-md text-xs transition"
                 >
-                  حفظ صنف اللوح
+                  {editingProduct
+                    ? language === 'ar' ? 'حفظ التعديلات' : 'Save Changes'
+                    : language === 'ar' ? 'إضافة الصنف' : 'Add Item'}
                 </button>
               </div>
             </form>
@@ -816,27 +1047,17 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         </div>
       )}
 
-      {/* Bulk Price Update Modal */}
-      {isBulkPriceModalOpen && selectedProducts.length > 0 && allSelectedSameWoodType && (
-        <BulkPriceUpdateModal
-          woodType={selectedWoodTypeForBulk}
-          selectedProducts={selectedProducts}
-          performedBy="admin"
-          language={language}
-          onClose={() => setIsBulkPriceModalOpen(false)}
-          onUpdated={handleBulkPriceUpdateSuccess}
-        />
-      )}
-
-      {/* Product Details / Movement History Modal */}
+      {/* Product Details Drawer */}
       {detailsProduct && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-slate-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-800">
-            <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3.5 sticky top-0 bg-slate-900 z-10">
-              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                <Trees className="w-4 h-4 text-amber-400" />
-                <span>{detailsProduct.name}</span>
-              </h3>
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/70 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-[#0e1424] border-l rtl:border-l-0 rtl:border-r border-slate-800 h-full flex flex-col shadow-2xl overflow-y-auto">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Eye className="w-4 h-4 text-amber-400" />
+                <h3 className="text-sm font-bold text-slate-100">
+                  {language === 'ar' ? 'تفاصيل وحركة الصنف' : 'Item Details & Movements'}
+                </h3>
+              </div>
               <button onClick={() => setDetailsProduct(null)} className="text-slate-400 hover:text-slate-200">
                 <X className="w-4 h-4" />
               </button>
@@ -856,6 +1077,14 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   <div>
                     <div className="text-[10px] text-slate-400">{language === 'ar' ? 'كود اللوح' : 'Code'}</div>
                     <div className="text-xs font-mono font-medium text-slate-200 mt-0.5">{detailsProduct.code}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400">{language === 'ar' ? 'التصنيف' : 'Category'}</div>
+                    <div className="text-xs font-semibold text-amber-400 mt-0.5">
+                      {detailsProduct.category ||
+                        woodTypeToCategoryName.get((detailsProduct.wood_type || '').trim().toLowerCase()) ||
+                        '—'}
+                    </div>
                   </div>
                   <div>
                     <div className="text-[10px] text-slate-400">{language === 'ar' ? 'نوع الخشب' : 'Wood Type'}</div>
@@ -879,72 +1108,70 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   </div>
                   <div>
                     <div className="text-[10px] text-slate-400">{language === 'ar' ? 'الرصيد الحالي' : 'Current Stock'}</div>
-                    <div className="text-xs font-mono font-bold text-slate-100 mt-0.5">{detailsProduct.stock_quantity} {language === 'ar' ? 'لوح' : ''}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-slate-400">{language === 'ar' ? 'تاريخ الإضافة' : 'Added On'}</div>
-                    <div className="text-xs font-mono text-slate-300 mt-0.5">
-                      {detailsProduct.created_at
-                        ? new Date(detailsProduct.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' })
-                        : '—'}
-                    </div>
+                    <div className="text-xs font-mono font-bold text-slate-100 mt-0.5">{detailsProduct.stock_quantity} لوح</div>
                   </div>
                 </div>
               </div>
 
-              {/* Movement history */}
+              {/* Movements history for this product */}
               <div>
                 <h4 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <History className="w-3.5 h-3.5" />
-                  <span>{language === 'ar' ? 'حركة الصنف بالمخازن' : 'Stock Movement'}</span>
+                  <History className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{language === 'ar' ? 'سجل حركات المخزن للصنف' : 'Stock Movements History'}</span>
                 </h4>
-
-                {productMovements.length > 0 ? (
-                  <div className="overflow-x-auto border border-slate-800 rounded-md">
-                    <table className="w-full text-xs text-right rtl:text-right ltr:text-left">
-                      <thead className="bg-[#090d16] text-slate-400 uppercase text-[10px] border-b border-slate-800">
-                        <tr>
-                          <th className="px-3 py-2">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
-                          <th className="px-3 py-2">{language === 'ar' ? 'نوع الحركة' : 'Type'}</th>
-                          <th className="px-3 py-2">{language === 'ar' ? 'الكمية' : 'Qty'}</th>
-                          <th className="px-3 py-2">{language === 'ar' ? 'الرصيد بعد الحركة' : 'Balance After'}</th>
-                          <th className="px-3 py-2">{language === 'ar' ? 'المرجع' : 'Reference'}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800/60">
-                        {productMovements.map(({ movement: m, balanceAfter }) => {
-                          const isPositive = m.quantity > 0;
-                          return (
-                            <tr key={m.id} className="hover:bg-slate-850/50">
-                              <td className="px-3 py-2 font-mono text-slate-400 whitespace-nowrap">
-                                <span className="inline-flex items-center gap-1">
-                                  <Clock className="w-3 h-3 text-slate-500" />
-                                  {new Date(m.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' })}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 text-slate-300">
-                                {language === 'ar' ? MOVEMENT_TYPE_LABELS_AR[m.movement_type] : m.movement_type}
-                              </td>
-                              <td className={`px-3 py-2 font-bold font-mono tabular-nums ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                {isPositive ? `+${m.quantity}` : m.quantity}
-                              </td>
-                              <td className="px-3 py-2 font-bold font-mono text-slate-100 tabular-nums">{balanceAfter}</td>
-                              <td className="px-3 py-2 font-mono text-slate-400">{m.reference_id || '—'}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="p-5 text-center text-slate-400 border border-dashed border-slate-800 rounded-md text-xs">
-                    {language === 'ar' ? 'لا توجد حركة مسجلة لهذا الصنف' : 'No movement recorded for this item'}
-                  </div>
-                )}
+                {(() => {
+                  const prodMovements = movements.filter((m) => m.product_id === detailsProduct.id);
+                  if (prodMovements.length === 0) {
+                    return (
+                      <div className="bg-slate-950 p-4 rounded-md border border-slate-800 text-center text-xs text-slate-500">
+                        {language === 'ar' ? 'لا توجد حركات مسجلة لهذا الصنف بعد' : 'No movements recorded yet.'}
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="bg-slate-950 rounded-md border border-slate-800 divide-y divide-slate-800 max-h-72 overflow-y-auto">
+                      {prodMovements.map((m) => (
+                        <div key={m.id} className="p-2.5 flex items-center justify-between text-xs">
+                          <div>
+                            <div className="font-medium text-slate-200">
+                              {MOVEMENT_TYPE_LABELS_AR[m.movement_type] || m.movement_type}
+                            </div>
+                            <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                              <Clock className="w-2.5 h-2.5" />
+                              <span>{new Date(m.created_at).toLocaleString('ar-EG')}</span>
+                            </div>
+                          </div>
+                          <span
+                            className={`font-mono font-bold ${
+                              m.quantity > 0 ? 'text-emerald-400' : 'text-rose-400'
+                            }`}
+                          >
+                            {m.quantity > 0 ? `+${m.quantity}` : m.quantity} لوح
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Bulk Price Update Modal */}
+      {isBulkPriceModalOpen && (
+        <BulkPriceUpdateModal
+          isOpen={isBulkPriceModalOpen}
+          onClose={() => setIsBulkPriceModalOpen(false)}
+          selectedProducts={selectedProducts}
+          woodType={selectedWoodTypeForBulk}
+          onSuccess={() => {
+            setSelectedProductIds(new Set());
+            if (onRefreshProducts) onRefreshProducts();
+          }}
+          language={language}
+        />
       )}
     </div>
   );

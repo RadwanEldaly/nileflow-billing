@@ -10,12 +10,15 @@ import {
   PurchaseInvoice,
   StockMovement,
   FinancialTransaction,
+  Category,
+  WoodType,
 } from './types';
 import { Header } from './components/Header';
 import { LoginScreen } from './components/LoginScreen';
 import { Navigation, NavTab } from './components/Navigation';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProductsPage } from './pages/ProductsPage';
+import { CategoriesPage } from './pages/CategoriesPage';
 import { WarehousesPage } from './pages/WarehousesPage';
 import { SalesPage } from './pages/SalesPage';
 import { PurchasesPage } from './pages/PurchasesPage';
@@ -27,6 +30,7 @@ import { ImportPage } from './pages/ImportPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { BackupModal } from './components/BackupModal';
 import { LoadingScreen } from './components/LoadingScreen';
+import { classificationService } from './services/classificationService';
 
 export function App() {
   const [language, setLanguage] = useState<'ar' | 'en'>('ar');
@@ -72,6 +76,10 @@ export function App() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [woodTypes, setWoodTypes] = useState<WoodType[]>([]);
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<string>('all');
+  const [catalogTypeFilter, setCatalogTypeFilter] = useState<string>('all');
   const [salesInvoices, setSalesInvoices] = useState<SalesInvoice[]>([]);
   const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoice[]>([]);
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
@@ -116,6 +124,11 @@ export function App() {
       if (purchRes.data) setPurchaseInvoices(purchRes.data);
       if (movRes.data) setStockMovements(movRes.data);
       if (txRes.data) setTransactions(txRes.data);
+
+      // Fetch and sync hierarchical categories and wood types
+      const classData = await classificationService.fetchClassification(prodRes.data || []);
+      if (classData.categories) setCategories(classData.categories);
+      if (classData.woodTypes) setWoodTypes(classData.woodTypes);
 
       // Add default warehouse if empty
       if (whRes.data && whRes.data.length === 0) {
@@ -168,6 +181,109 @@ export function App() {
       setProducts(products.filter((p) => p.id !== id));
     } else {
       console.error('Error deleting product:', error);
+    }
+  };
+
+  // CATEGORY & WOOD TYPE HANDLERS
+  const handleAddCategory = async (name: string, description?: string) => {
+    try {
+      const newCat = await classificationService.addCategory(name, description);
+      setCategories((prev) => [...prev.filter((c) => c.id !== newCat.id), newCat]);
+    } catch (err: any) {
+      alert(language === 'ar' ? `فشل إضافة التصنيف: ${err.message}` : `Failed to add category: ${err.message}`);
+    }
+  };
+
+  const handleUpdateCategory = async (id: string, name: string, description?: string, oldName?: string) => {
+    try {
+      const updated = await classificationService.updateCategory(id, name, description, oldName);
+      setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
+      if (oldName && oldName !== name) {
+        setProducts((prev) => prev.map((p) => (p.category === oldName ? { ...p, category: name } : p)));
+      }
+    } catch (err: any) {
+      alert(language === 'ar' ? `فشل تعديل التصنيف: ${err.message}` : `Failed to update category: ${err.message}`);
+    }
+  };
+
+  const handleDeleteCategory = async (
+    id: string,
+    categoryName: string,
+    reassignCategoryId: string | null,
+    targetCategoryName: string | null
+  ) => {
+    try {
+      await classificationService.deleteCategory(id, categoryName, reassignCategoryId, targetCategoryName);
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+      setWoodTypes((prev) =>
+        prev.map((t) => (t.category_id === id ? { ...t, category_id: reassignCategoryId } : t))
+      );
+      if (targetCategoryName) {
+        setProducts((prev) =>
+          prev.map((p) => (p.category === categoryName ? { ...p, category: targetCategoryName } : p))
+        );
+      } else {
+        setProducts((prev) =>
+          prev.map((p) => (p.category === categoryName ? { ...p, category: 'غير مصنف' } : p))
+        );
+      }
+    } catch (err: any) {
+      alert(language === 'ar' ? `فشل حذف التصنيف: ${err.message}` : `Failed to delete category: ${err.message}`);
+    }
+  };
+
+  const handleAddWoodType = async (name: string, category_id: string | null) => {
+    try {
+      const newType = await classificationService.addWoodType(name, category_id);
+      setWoodTypes((prev) => [...prev.filter((t) => t.id !== newType.id), newType]);
+    } catch (err: any) {
+      alert(language === 'ar' ? `فشل إضافة نوع الخشب: ${err.message}` : `Failed to add wood type: ${err.message}`);
+    }
+  };
+
+  const handleUpdateWoodType = async (
+    id: string,
+    updates: { name?: string; category_id?: string | null },
+    oldName?: string,
+    parentCategoryName?: string
+  ) => {
+    try {
+      const updated = await classificationService.updateWoodType(id, updates, oldName, parentCategoryName);
+      setWoodTypes((prev) => prev.map((t) => (t.id === id ? { ...t, ...updated } : t)));
+      if (updates.name && oldName && updates.name !== oldName) {
+        setProducts((prev) =>
+          prev.map((p) => {
+            if (p.wood_type === oldName) {
+              return {
+                ...p,
+                wood_type: updates.name!,
+                ...(parentCategoryName ? { category: parentCategoryName } : {}),
+              };
+            }
+            return p;
+          })
+        );
+      } else if (parentCategoryName && oldName) {
+        setProducts((prev) =>
+          prev.map((p) => (p.wood_type === oldName ? { ...p, category: parentCategoryName } : p))
+        );
+      }
+    } catch (err: any) {
+      alert(language === 'ar' ? `فشل تعديل نوع الخشب: ${err.message}` : `Failed to update wood type: ${err.message}`);
+    }
+  };
+
+  const handleDeleteWoodType = async (id: string, woodTypeName: string, reassignTypeName: string | null) => {
+    try {
+      await classificationService.deleteWoodType(id, woodTypeName, reassignTypeName);
+      setWoodTypes((prev) => prev.filter((t) => t.id !== id));
+      if (reassignTypeName) {
+        setProducts((prev) =>
+          prev.map((p) => (p.wood_type === woodTypeName ? { ...p, wood_type: reassignTypeName } : p))
+        );
+      }
+    } catch (err: any) {
+      alert(language === 'ar' ? `فشل حذف نوع الخشب: ${err.message}` : `Failed to delete wood type: ${err.message}`);
     }
   };
 
@@ -846,6 +962,7 @@ export function App() {
   const tabTitles: Record<NavTab, { ar: string; en: string }> = {
     dashboard: { ar: 'لوحة المتابعة والمؤشرات', en: 'Dashboard & Metrics' },
     products: { ar: 'كتالوج الألواح الخشبية', en: 'Wood Sheets Catalog' },
+    categories: { ar: 'التصنيفات وهيكل الأخشاب', en: 'Categories & Types' },
     warehouses: { ar: 'المخازن وحركة الألواح', en: 'Warehouses & Stock' },
     sales: { ar: 'فواتير مبيعات الأخشاب', en: 'Wood Sales Invoices' },
     purchases: { ar: 'فواتير مشتريات وتوريد الأخشاب', en: 'Wood Purchase Invoices' },
@@ -930,16 +1047,41 @@ export function App() {
             />
           )}
 
+          {activeTab === 'categories' && (
+            <CategoriesPage
+              categories={categories}
+              woodTypes={woodTypes}
+              products={products}
+              language={language}
+              onAddCategory={handleAddCategory}
+              onUpdateCategory={handleUpdateCategory}
+              onDeleteCategory={handleDeleteCategory}
+              onAddWoodType={handleAddWoodType}
+              onUpdateWoodType={handleUpdateWoodType}
+              onDeleteWoodType={handleDeleteWoodType}
+              onNavigateToCatalogWithFilter={(catName, typeName) => {
+                setCatalogCategoryFilter(catName);
+                setCatalogTypeFilter(typeName || 'all');
+                setActiveTab('products');
+              }}
+            />
+          )}
+
           {activeTab === 'products' && (
             <ProductsPage
               products={products}
+              categories={categories}
+              woodTypesList={woodTypes}
               suppliers={suppliers}
               movements={stockMovements}
               language={language}
+              initialCategoryFilter={catalogCategoryFilter}
+              initialTypeFilter={catalogTypeFilter}
               onAddProduct={handleAddProduct}
               onUpdateProduct={handleUpdateProduct}
               onDeleteProduct={handleDeleteProduct}
               onNavigateToImport={() => setActiveTab('import')}
+              onNavigateToCategories={() => setActiveTab('categories')}
               onRefreshProducts={async () => {
                 const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
                 if (data) setProducts(data);
@@ -1052,6 +1194,8 @@ export function App() {
               suppliers={suppliers}
               salesInvoices={salesInvoices}
               purchaseInvoices={purchaseInvoices}
+              categories={categories}
+              woodTypes={woodTypes}
               language={language}
             />
           )}
